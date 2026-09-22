@@ -1,0 +1,7 @@
+streamlit
+snowflake-connector-python
+pandas
+PyYAML
+jinja2
+streamlit-agraph
+networkx
