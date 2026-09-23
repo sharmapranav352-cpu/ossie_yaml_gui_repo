@@ -178,23 +178,31 @@ def clear_meta_cache():
 # UI HELPERS
 ##################################################
 
-def save_bar(label, current, saved, on_save):
-    """Save button plus a saved / unsaved-changes indicator."""
-    col1, col2 = st.columns([1, 3])
+def save_bar(label, current, saved, on_save, next_step=None):
+    """Save button, a quiet saved/unsaved status, and an optional next step."""
+    from utils.branding import continue_to
+
+    col1, col2, col3 = st.columns([1.1, 2.4, 1.5], vertical_alignment="center")
 
     with col1:
-        clicked = st.button(label, type="primary", use_container_width=True)
+        clicked = st.button(
+            label, type="primary", icon=":material/save:",
+            use_container_width=True
+        )
 
     if clicked:
         on_save(current)
         saved = current
+        st.toast(f"{label.replace('Save ', '').capitalize()} saved")
 
     with col2:
-        if clicked:
-            st.success("Saved.")
-        elif current != saved:
-            st.warning("You have unsaved changes.")
-        else:
-            st.caption("All changes saved.")
+        if current != saved:
+            st.markdown(":orange[:material/pending: Unsaved changes]")
+        elif saved:
+            st.markdown(":green[:material/check_circle: All changes saved]")
+
+    if next_step:
+        with col3:
+            continue_to(*next_step)
 
     return clicked
