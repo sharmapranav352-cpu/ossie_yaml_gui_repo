@@ -8,20 +8,51 @@ class SnowflakeService:
         self,
         account,
         username,
-        password,
-        warehouse,
-        role
+        password=None,
+        warehouse=None,
+        role=None,
+        authenticator="snowflake",
+        passcode=None,
+        pat=None
     ):
+        """
+        authenticator options:
+          - "snowflake"              : standard username/password, no MFA.
+                                        Also used for a Programmatic Access
+                                        Token (PAT) -- just pass the token
+                                        value as `pat` (or `password`); no
+                                        special authenticator is needed.
+          - "username_password_mfa"  : username/password + TOTP passcode
+          - "externalbrowser"        : SSO / browser-based login (opens a
+                                        browser window on the machine running
+                                        the app -- only works if that machine
+                                        has a browser, e.g. local dev, not
+                                        headless servers)
 
-        self.conn = (
-            snowflake.connector.connect(
-                account=account,
-                user=username,
-                password=password,
-                warehouse=warehouse,
-                role=role
-            )
-        )
+        If your account's only registered MFA method is a Passkey (WebAuthn),
+        neither Duo push nor a TOTP passcode will work here -- passkeys
+        require an interactive browser/security-key ceremony that can't be
+        scripted. Use a Programmatic Access Token instead (pass it as `pat`).
+        """
+
+        connect_kwargs = {
+            "account": account,
+            "user": username,
+            "warehouse": warehouse,
+            "role": role,
+            "authenticator": authenticator,
+        }
+
+        # A PAT is used exactly like a password -- no special authenticator.
+        if pat:
+            connect_kwargs["password"] = pat
+        elif password:
+            connect_kwargs["password"] = password
+
+        if authenticator == "username_password_mfa" and passcode:
+            connect_kwargs["passcode"] = passcode
+
+        self.conn = snowflake.connector.connect(**connect_kwargs)
 
     def execute(
         self,
