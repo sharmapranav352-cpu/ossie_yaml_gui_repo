@@ -10,6 +10,7 @@ from services.builders import (
     validate,
 )
 from services.yaml_service import OssieGenerator
+from utils.branding import continue_to, page_header
 from utils.file_manager import list_yamls, save_yaml
 from utils.state import (
     config_json,
@@ -20,9 +21,13 @@ from utils.state import (
     seed_value,
 )
 
-st.title("Generate OSSIE YAML")
-
 init_state()
+
+page_header(
+    "Generate the semantic model",
+    "Name the model, check it, and export the OSSIE YAML. The file is built "
+    "from what you saved on each step."
+)
 
 saved = st.session_state.saved
 
@@ -30,47 +35,44 @@ saved = st.session_state.saved
 # MODEL DETAILS
 #################################################
 
-seed_value("gen_model_name", saved["model"]["name"])
-seed_value("gen_model_desc", saved["model"]["description"])
+with st.container(border=True):
 
-model_name = st.text_input("Semantic Model Name", key="gen_model_name")
-model_description = st.text_area("Description", key="gen_model_desc")
+    seed_value("gen_model_name", saved["model"]["name"])
+    seed_value("gen_model_desc", saved["model"]["description"])
 
-model_cfg = {
-    "name": model_name.strip(),
-    "description": model_description.strip(),
-}
+    c1, c2 = st.columns([1, 2])
+    model_name = c1.text_input("Model name", key="gen_model_name")
+    model_description = c2.text_input("Description", key="gen_model_desc")
 
-if model_cfg != saved["model"]:
-    save_section("model", model_cfg)
+    model_cfg = {
+        "name": model_name.strip(),
+        "description": model_description.strip(),
+    }
 
-#################################################
-# SUMMARY (SAVED CONFIG ONLY)
-#################################################
-
-st.caption(
-    "The YAML is generated from what you saved on each page. "
-    "Unsaved edits on other pages are not included."
-)
-
-col1, col2, col3 = st.columns(3)
-col1.metric("Saved Datasets", len(saved["datasets"]["tables"]))
-col2.metric("Saved Relationships", len(saved["relationships"]))
-col3.metric("Saved Metrics", len(saved["metrics"]))
+    if model_cfg != saved["model"]:
+        save_section("model", model_cfg)
 
 #################################################
-# VALIDATION
+# CHECKS
 #################################################
 
 errors, warnings = validate(saved)
 
-for e in errors:
-    st.error(e)
+if errors:
+    st.error(
+        "Fix these before generating:\n\n"
+        + "\n".join(f"- {e}" for e in errors)
+    )
+    if not saved["datasets"]["tables"]:
+        continue_to("datasets", "Go to datasets")
+else:
+    st.success("Everything checks out. The model is ready to generate.")
 
 if warnings:
-    with st.expander(f"{len(warnings)} warning(s)"):
+    label = "1 suggestion" if len(warnings) == 1 else f"{len(warnings)} suggestions"
+    with st.expander(f"{label} to improve the model"):
         for w in warnings:
-            st.warning(w)
+            st.markdown(f"- {w}")
 
 #################################################
 # YAML GENERATION
@@ -79,6 +81,7 @@ if warnings:
 if st.button(
     "Generate YAML",
     type="primary",
+    icon=":material/play_arrow:",
     disabled=bool(errors)
 ):
     st.session_state.generated_yaml = OssieGenerator.generate(
@@ -92,79 +95,95 @@ if st.button(
 
 if "generated_yaml" in st.session_state:
 
-    st.subheader("Generated YAML")
-
-    st.code(st.session_state.generated_yaml, language="yaml")
-
     safe_name = re.sub(
         r"[^A-Za-z0-9_.-]", "_",
         st.session_state.get("generated_for") or "model"
     )
     filename = f"{safe_name}.yaml"
+    yaml_text = st.session_state.generated_yaml
 
-    c1, c2 = st.columns(2)
+    with st.container(border=True):
 
-    with c1:
-        if st.button("Save YAML"):
-            save_yaml(filename, st.session_state.generated_yaml)
-            st.success(f"Saved outputs/{filename}")
+        h1, h2, h3 = st.columns([3, 1, 1], vertical_alignment="center")
 
-    with c2:
-        st.download_button(
-            label="Download YAML",
-            data=st.session_state.generated_yaml,
-            file_name=filename,
-            mime="text/yaml"
+        h1.markdown(
+            f"**{filename}**  \n"
+            f"<span style='color:#5A6878;font-size:.875rem'>"
+            f"{len(yaml_text.splitlines())} lines</span>",
+            unsafe_allow_html=True
         )
 
+        with h2:
+            st.download_button(
+                "Download",
+                data=yaml_text,
+                file_name=filename,
+                mime="text/yaml",
+                icon=":material/download:",
+                type="primary",
+                use_container_width=True
+            )
+
+        with h3:
+            if st.button(
+                "Save to outputs",
+                icon=":material/save:",
+                use_container_width=True
+            ):
+                save_yaml(filename, yaml_text)
+                st.toast(f"Saved outputs/{filename}")
+
+        st.code(yaml_text, language="yaml", height=520)
+
 #################################################
-# SAVED FILES
+# PROJECT FILES
 #################################################
 
-st.divider()
-st.subheader("Saved YAML Files")
+st.write("")
 
-files = list_yamls()
+with st.expander("Project settings and saved files"):
 
-if files:
-    for file in files:
-        st.write(file.name)
-else:
-    st.info("No saved YAMLs")
+    st.markdown("**Saved YAML files**")
+    files = list_yamls()
+    if files:
+        for file in files:
+            st.markdown(f"- `outputs/{file.name}`")
+    else:
+        st.caption("No YAML files saved yet.")
 
-#################################################
-# PROJECT CONFIGURATION
-#################################################
+    st.divider()
 
-st.divider()
-st.subheader("Project Configuration")
+    st.markdown("**Configuration**")
+    st.caption(
+        "Your saved steps are stored in saved_config/model_config.json and "
+        "reload automatically. Export them to share a model or reuse it later."
+    )
 
-st.caption(
-    "Your saved settings are stored in saved_config/model_config.json "
-    "and reloaded automatically. You can also export them or load a "
-    "previous project."
-)
+    st.download_button(
+        "Export configuration",
+        data=config_json(),
+        file_name=f"{model_cfg['name'] or 'model'}_config.json",
+        mime="application/json",
+        icon=":material/upload_file:"
+    )
 
-st.download_button(
-    "⬇ Export configuration (JSON)",
-    data=config_json(),
-    file_name=f"{model_cfg['name'] or 'model'}_config.json",
-    mime="application/json"
-)
+    uploaded = st.file_uploader("Load a configuration file", type=["json"])
 
-uploaded = st.file_uploader("Load a configuration file", type=["json"])
+    if uploaded is not None and st.button("Load configuration"):
+        try:
+            replace_config(json.loads(uploaded.getvalue().decode("utf-8")))
+            st.session_state.pop("generated_yaml", None)
+            st.rerun()
+        except ValueError as exc:
+            st.error(f"That file isn't a valid configuration: {exc}")
 
-if uploaded is not None and st.button("Load this configuration"):
-    try:
-        replace_config(json.loads(uploaded.getvalue().decode("utf-8")))
-        st.session_state.pop("generated_yaml", None)
-        st.rerun()
-    except ValueError as exc:
-        st.error(f"Could not read that file: {exc}")
+    st.divider()
 
-with st.expander("Reset everything"):
-    confirm = st.checkbox("I want to clear all saved datasets, relationships and metrics")
-    if st.button("Reset", disabled=not confirm):
+    st.markdown("**Start over**")
+    confirm = st.checkbox(
+        "Clear all saved datasets, relationships and metrics"
+    )
+    if st.button("Clear everything", disabled=not confirm):
         reset_config()
         st.session_state.pop("generated_yaml", None)
         st.rerun()

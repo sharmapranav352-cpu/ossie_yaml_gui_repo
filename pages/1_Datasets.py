@@ -1,6 +1,7 @@
 import streamlit as st
 
 from services.builders import TIME_TYPES, build_datasets
+from utils.branding import continue_to, page_header
 from utils.state import (
     cached_meta,
     clear_meta_cache,
@@ -11,9 +12,13 @@ from utils.state import (
     seed_multi,
 )
 
-st.title("Dataset Builder")
-
 init_state()
+
+page_header(
+    "Choose your datasets",
+    "Select the Snowflake tables to include, then choose the columns, "
+    "primary keys and date fields for each one."
+)
 
 saved_cfg = st.session_state.saved["datasets"]
 sf = st.session_state.snowflake
@@ -25,7 +30,7 @@ sf = st.session_state.snowflake
 if sf is None:
 
     st.warning(
-        "Connect to Snowflake on the app page to edit datasets."
+        "Connect to Snowflake to choose or edit datasets."
     )
 
     if saved_cfg["tables"]:
@@ -36,10 +41,8 @@ if sf is None:
         with st.expander("Saved datasets"):
             st.json(build_datasets(saved_cfg))
 
+    continue_to("connect", "Go to connect")
     st.stop()
-
-if st.button("↻ Refresh Snowflake metadata"):
-    clear_meta_cache()
 
 ##################################################
 # DATABASE / SCHEMA
@@ -49,11 +52,14 @@ databases = cached_meta("databases", sf.get_databases)
 
 seed_choice("ds_database", databases, saved_cfg["database"])
 
-database = st.selectbox(
-    "Database",
-    databases,
-    key="ds_database"
-)
+src1, src2, src3 = st.columns([2, 2, 1], vertical_alignment="bottom")
+
+with src1:
+    database = st.selectbox(
+        "Database",
+        databases,
+        key="ds_database"
+    )
 
 schemas = (
     cached_meta("schemas", sf.get_schemas, database)
@@ -66,11 +72,22 @@ seed_choice(
     saved_cfg["schema"] if database == saved_cfg["database"] else None
 )
 
-schema = st.selectbox(
-    "Schema",
-    schemas,
-    key="ds_schema"
-)
+with src2:
+    schema = st.selectbox(
+        "Schema",
+        schemas,
+        key="ds_schema"
+    )
+
+with src3:
+    if st.button(
+        "Refresh",
+        icon=":material/refresh:",
+        use_container_width=True,
+        help="Reload databases, schemas, tables and columns from Snowflake."
+    ):
+        clear_meta_cache()
+        st.rerun()
 
 ##################################################
 # TABLES
@@ -94,7 +111,7 @@ saved_tables = (
 seed_multi("ds_tables", tables, list(saved_tables))
 
 selected_tables = st.multiselect(
-    "Select Tables",
+    "Tables",
     tables,
     key="ds_tables"
 )
@@ -115,7 +132,8 @@ def suggested_primary_keys(table):
 # PER-TABLE CONFIG
 ##################################################
 
-st.divider()
+if not selected_tables:
+    st.info("Choose one or more tables to set them up as datasets.")
 
 table_cfgs = []
 
@@ -124,7 +142,18 @@ for table in selected_tables:
     prev = saved_tables.get(table)
     key = f"ds_{database}.{schema}.{table}"
 
-    with st.expander(f"Dataset: {table}", expanded=True):
+    columns_df = cached_meta(
+        "columns", sf.get_columns, database, schema, table
+    )
+    n_selected = len(st.session_state.get(
+        f"{key}.cols",
+        prev["selected_columns"] if prev else columns_df["COLUMN_NAME"]
+    ))
+
+    with st.expander(
+        f"**{table}**  \n{n_selected} of {len(columns_df)} columns",
+        expanded=len(selected_tables) <= 3
+    ):
 
         columns_df = cached_meta(
             "columns", sf.get_columns, database, schema, table
@@ -142,7 +171,7 @@ for table in selected_tables:
         )
 
         selected_columns = st.multiselect(
-            f"Columns - {table}",
+            "Columns",
             available,
             key=f"{key}.cols"
         )
@@ -155,7 +184,7 @@ for table in selected_tables:
         )
 
         primary_keys = st.multiselect(
-            f"Primary Keys - {table}",
+            "Primary key",
             selected_columns,
             key=f"{key}.pk"
         )
@@ -170,10 +199,10 @@ for table in selected_tables:
         )
 
         time_columns = st.multiselect(
-            f"Time Dimensions - {table}",
+            "Date and time fields",
             selected_columns,
             key=f"{key}.time",
-            help="Date/timestamp columns are pre-selected."
+            help="Date and timestamp columns are selected for you."
         )
 
     table_cfgs.append({
@@ -197,11 +226,14 @@ current = {
 
 st.divider()
 
+has_work = bool(saved_cfg["tables"] or table_cfgs)
+
 save_bar(
-    "💾 Save Datasets",
+    "Save datasets",
     current,
-    saved_cfg,
-    lambda cfg: save_section("datasets", cfg)
+    saved_cfg if has_work else current,
+    lambda cfg: save_section("datasets", cfg),
+    next_step=("relationships", "Continue to relationships") if has_work else None
 )
 
 latest = st.session_state.saved["datasets"]
@@ -215,5 +247,6 @@ if latest["tables"] and (
         "Saving here will replace them."
     )
 
-with st.expander("Saved Dataset JSON"):
-    st.json(build_datasets(latest))
+if latest["tables"]:
+    with st.expander("View saved datasets as JSON"):
+        st.json(build_datasets(latest), expanded=False)
