@@ -12,25 +12,27 @@ class SnowflakeService:
         warehouse=None,
         role=None,
         authenticator="snowflake",
-        passcode=None
+        passcode=None,
+        pat=None
     ):
         """
         authenticator options:
-          - "snowflake"              : standard username/password, no MFA
+          - "snowflake"              : standard username/password, no MFA.
+                                        Also used for a Programmatic Access
+                                        Token (PAT) -- just pass the token
+                                        value as `pat` (or `password`); no
+                                        special authenticator is needed.
           - "username_password_mfa"  : username/password + TOTP passcode
-                                        (also lets Snowflake cache the MFA
-                                        token so you aren't prompted every time)
           - "externalbrowser"        : SSO / browser-based login (opens a
                                         browser window on the machine running
                                         the app -- only works if that machine
                                         has a browser, e.g. local dev, not
                                         headless servers)
 
-        For plain Duo Push (no code, just approve on your phone), you don't
-        need any of the above -- use authenticator="snowflake" with password,
-        and Snowflake will trigger the push automatically if Duo is enabled
-        for your account/role. The connector call will block until you
-        approve or it times out.
+        If your account's only registered MFA method is a Passkey (WebAuthn),
+        neither Duo push nor a TOTP passcode will work here -- passkeys
+        require an interactive browser/security-key ceremony that can't be
+        scripted. Use a Programmatic Access Token instead (pass it as `pat`).
         """
 
         connect_kwargs = {
@@ -41,7 +43,10 @@ class SnowflakeService:
             "authenticator": authenticator,
         }
 
-        if password:
+        # A PAT is used exactly like a password -- no special authenticator.
+        if pat:
+            connect_kwargs["password"] = pat
+        elif password:
             connect_kwargs["password"] = password
 
         if authenticator == "username_password_mfa" and passcode:

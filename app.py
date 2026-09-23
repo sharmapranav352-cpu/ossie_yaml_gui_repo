@@ -52,8 +52,9 @@ with col2:
 st.subheader("Multi-Factor Authentication")
 
 mfa_choice = st.radio(
-    "MFA method",
+    "MFA / auth method",
     [
+        "Programmatic Access Token (PAT)",
         "Duo Push (approve on phone, no code needed)",
         "Passcode (TOTP from authenticator app)",
         "External Browser / SSO",
@@ -63,13 +64,34 @@ mfa_choice = st.radio(
 )
 
 passcode = None
+pat = None
 authenticator = "snowflake"
 
-if mfa_choice.startswith("Duo Push"):
+if mfa_choice.startswith("Programmatic"):
+    authenticator = "snowflake"
+    pat = st.text_input(
+        "Programmatic Access Token",
+        type="password",
+        help=(
+            "Generate this under Snowsight -> Authentication -> "
+            "Programmatic access tokens. Use this if your only registered "
+            "MFA method is a Passkey -- passkeys can't be automated, but "
+            "a PAT sidesteps MFA entirely."
+        )
+    )
+    st.caption(
+        "If you see a 'Missing network policy' warning on the token "
+        "generation page, ask a Snowflake admin to apply a network policy "
+        "or authentication policy before this will work -- otherwise the "
+        "connection will fail with a 401."
+    )
+
+elif mfa_choice.startswith("Duo Push"):
     authenticator = "snowflake"
     st.caption(
         "Click Connect, then approve the Duo push notification sent to "
-        "your phone. The app will wait until you approve or it times out."
+        "your phone. Only works if Duo is a registered MFA method on "
+        "your account -- it won't trigger for passkey-only accounts."
     )
 
 elif mfa_choice.startswith("Passcode"):
@@ -79,16 +101,18 @@ elif mfa_choice.startswith("Passcode"):
         max_chars=6
     )
     st.caption(
-        "Enter the current code from your authenticator app (e.g. Duo "
-        "Mobile, Google Authenticator) alongside your password."
+        "Enter the current code from your authenticator app. Only works "
+        "if a TOTP authenticator is a registered MFA method on your "
+        "account -- it won't work for passkey-only accounts."
     )
 
 elif mfa_choice.startswith("External Browser"):
     authenticator = "externalbrowser"
     st.caption(
         "A browser window will open on the machine running this app for "
-        "you to complete SSO login. This only works if that machine has "
-        "a browser available -- it will not work on a headless server."
+        "you to complete SSO/passkey login. This only works if that "
+        "machine has a browser available -- it will not work on a "
+        "headless server like EC2."
     )
 
 else:
@@ -105,7 +129,8 @@ if st.button("Connect"):
             warehouse=warehouse,
             role=role,
             authenticator=authenticator,
-            passcode=passcode
+            passcode=passcode,
+            pat=pat
         )
 
         st.session_state.snowflake = sf
