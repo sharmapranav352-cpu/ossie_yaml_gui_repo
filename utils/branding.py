@@ -63,7 +63,7 @@ def _css():
 /* Page frame */
 .block-container {{
   max-width: 1120px;
-  padding-top: 1.75rem;
+  padding-top: 4.5rem;
   padding-bottom: 4rem;
 }}
 [data-testid="stDecoration"], footer {{ display: none; }}
@@ -132,7 +132,7 @@ h2, h3 {{ letter-spacing: -0.005em; }}
   background: var(--ossie-primary); color: #fff;
 }}
 @media (max-width: 760px) {{
-  .block-container {{ padding-top: 3.5rem; }}
+  .block-container {{ padding-top: 4.5rem; }}
   .ossie-rail li {{ flex: 0 0 auto; padding-right: .5rem; gap: .375rem; }}
   .ossie-rail li:not(.is-current) .ossie-text {{ display: none; }}
   .ossie-rail li.is-current {{ flex: 1 1 auto; }}
