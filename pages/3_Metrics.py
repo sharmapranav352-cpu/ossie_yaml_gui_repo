@@ -1,24 +1,41 @@
 import streamlit as st
 
+from services.builders import METRIC_TYPES, build_metrics, metric_expression
+from utils.state import (
+    init_state,
+    save_bar,
+    save_section,
+    seed_choice,
+    seed_value,
+)
+
 st.title("Metric Builder")
 
-if st.session_state.snowflake is None:
-    st.warning("Please connect first.")
+init_state()
+
+datasets_cfg = st.session_state.saved["datasets"]
+saved_metrics = st.session_state.saved["metrics"]
+
+if not datasets_cfg["tables"]:
+    st.warning("Save at least one dataset on the Datasets page first.")
     st.stop()
 
-if not st.session_state.datasets:
-    st.warning("Please configure datasets first.")
-    st.stop()
+tables = [t["name"] for t in datasets_cfg["tables"]]
+columns_by_table = {
+    t["name"]: t["selected_columns"] for t in datasets_cfg["tables"]
+}
 
 #################################################
 # METRIC COUNT
 #################################################
 
+seed_value("met_count", len(saved_metrics))
+
 metric_count = st.number_input(
     "Number of Metrics",
     min_value=0,
-    value=1,
-    step=1
+    step=1,
+    key="met_count"
 )
 
 metrics = []
@@ -27,119 +44,60 @@ metrics = []
 # METRICS
 #################################################
 
-for idx in range(metric_count):
+for idx in range(int(metric_count)):
+
+    prev = saved_metrics[idx] if idx < len(saved_metrics) else {}
 
     st.divider()
+    st.subheader(f"Metric {idx + 1}")
 
-    st.subheader(
-        f"Metric {idx + 1}"
-    )
+    seed_value(f"met_{idx}_name", prev.get("name", ""))
+    metric_name = st.text_input("Metric Name", key=f"met_{idx}_name")
 
-    metric_name = st.text_input(
-        "Metric Name",
-        key=f"metric_name_{idx}"
-    )
-
+    seed_value(f"met_{idx}_desc", prev.get("description", ""))
     metric_description = st.text_input(
-        "Description",
-        key=f"metric_desc_{idx}"
+        "Description", key=f"met_{idx}_desc"
     )
 
+    seed_choice(f"met_{idx}_type", METRIC_TYPES, prev.get("type", "SUM"))
     metric_type = st.selectbox(
-        "Metric Type",
-        [
-            "SUM",
-            "AVG",
-            "COUNT",
-            "COUNT DISTINCT",
-            "MIN",
-            "MAX",
-            "CUSTOM"
-        ],
-        key=f"metric_type_{idx}"
+        "Metric Type", METRIC_TYPES, key=f"met_{idx}_type"
     )
 
-    #################################################
-    # STANDARD METRICS
-    #################################################
+    metric = {
+        "name": metric_name.strip(),
+        "description": metric_description.strip(),
+        "type": metric_type,
+        "table": None,
+        "column": None,
+        "expression": "",
+    }
 
     if metric_type != "CUSTOM":
 
+        seed_choice(f"met_{idx}_table", tables, prev.get("table"))
         table = st.selectbox(
-            "Dataset",
-            [x["name"] for x in st.session_state.datasets],
-            key=f"metric_table_{idx}"
+            "Dataset", tables, key=f"met_{idx}_table"
         )
 
-        cols = []
+        cols = columns_by_table.get(table, [])
+        seed_choice(f"met_{idx}_col", cols, prev.get("column"))
+        column = st.selectbox("Column", cols, key=f"met_{idx}_col")
 
-        for ds in st.session_state.datasets:
-
-            if ds["name"] == table:
-
-                cols = [
-                    f["name"]
-                    for f in ds["fields"]
-                ]
-
-        column = st.selectbox(
-            "Column",
-            cols,
-            key=f"metric_col_{idx}"
-        )
-
-        if metric_type == "COUNT DISTINCT":
-
-            expression = (
-                f"COUNT(DISTINCT {table}.{column})"
-            )
-
-        else:
-
-            expression = (
-                f"{metric_type}({table}.{column})"
-            )
-
-        st.code(expression)
-
-    #################################################
-    # CUSTOM METRICS
-    #################################################
+        metric["table"] = table
+        metric["column"] = column
 
     else:
 
-        expression = st.text_area(
+        seed_value(f"met_{idx}_custom", prev.get("expression", ""))
+        metric["expression"] = st.text_area(
             "Custom Expression",
-            key=f"custom_exp_{idx}",
-            height=120
+            key=f"met_{idx}_custom",
+            height=120,
+            help="You can reference other metrics, e.g. TOTAL_PRICE / TOTAL_QUANTITY"
         )
 
-    #################################################
-    # BUILD JSON
-    #################################################
-
-    metric = {
-
-        "name": metric_name,
-
-        "expression": {
-            "dialects": [
-                {
-                    "dialect": "SNOWFLAKE",
-                    "expression": expression
-                }
-            ]
-        },
-
-        "description": metric_description,
-
-        "custom_extensions": [
-            {
-                "vendor_name": "SNOWFLAKE",
-                "data": "{\"access_modifier\":\"public_access\"}"
-            }
-        ]
-    }
+    st.code(metric_expression(metric) or "-- empty --", language="sql")
 
     metrics.append(metric)
 
@@ -147,12 +105,22 @@ for idx in range(metric_count):
 # SAVE
 #################################################
 
-st.session_state.metrics = metrics
+st.divider()
 
-st.success(
-    f"{len(metrics)} metric(s) configured"
+names = [m["name"] for m in metrics if m["name"]]
+dupes = sorted({n for n in names if names.count(n) > 1})
+if dupes:
+    st.error("Duplicate metric names: " + ", ".join(dupes))
+
+if any(not m["name"] for m in metrics):
+    st.info("Every metric needs a name before the YAML can be generated.")
+
+save_bar(
+    "💾 Save Metrics",
+    metrics,
+    saved_metrics,
+    lambda cfg: save_section("metrics", cfg)
 )
 
-st.subheader("Metric Preview")
-
-st.json(metrics)
+with st.expander("Saved Metric JSON"):
+    st.json(build_metrics(st.session_state.saved["metrics"]))
