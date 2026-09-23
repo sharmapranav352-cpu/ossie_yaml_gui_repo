@@ -1,5 +1,6 @@
 import streamlit as st
 from services.snowflake_service import SnowflakeService
+from utils.state import init_state
 
 st.set_page_config(
     page_title="OSSIE Generator",
@@ -8,17 +9,7 @@ st.set_page_config(
 
 st.title("OSSIE YAML Generator")
 
-if "snowflake" not in st.session_state:
-    st.session_state.snowflake = None
-
-if "datasets" not in st.session_state:
-    st.session_state.datasets = []
-
-if "relationships" not in st.session_state:
-    st.session_state.relationships = []
-
-if "metrics" not in st.session_state:
-    st.session_state.metrics = []
+init_state()
 
 st.header("Snowflake Connection")
 
@@ -151,4 +142,23 @@ if st.session_state.snowflake:
 
     st.info(
         "Use left navigation to continue."
+    )
+
+saved = st.session_state.saved
+
+if saved["datasets"]["tables"]:
+
+    st.divider()
+
+    st.subheader("Saved Configuration")
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Datasets", len(saved["datasets"]["tables"]))
+    c2.metric("Relationships", len(saved["relationships"]))
+    c3.metric("Metrics", len(saved["metrics"]))
+
+    st.caption(
+        "Loaded from your last session. Relationships, Metrics and "
+        "Generate YAML work without reconnecting; editing datasets "
+        "needs a Snowflake connection."
     )
