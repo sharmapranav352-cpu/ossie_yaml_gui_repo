@@ -8,20 +8,46 @@ class SnowflakeService:
         self,
         account,
         username,
-        password,
-        warehouse,
-        role
+        password=None,
+        warehouse=None,
+        role=None,
+        authenticator="snowflake",
+        passcode=None
     ):
+        """
+        authenticator options:
+          - "snowflake"              : standard username/password, no MFA
+          - "username_password_mfa"  : username/password + TOTP passcode
+                                        (also lets Snowflake cache the MFA
+                                        token so you aren't prompted every time)
+          - "externalbrowser"        : SSO / browser-based login (opens a
+                                        browser window on the machine running
+                                        the app -- only works if that machine
+                                        has a browser, e.g. local dev, not
+                                        headless servers)
 
-        self.conn = (
-            snowflake.connector.connect(
-                account=account,
-                user=username,
-                password=password,
-                warehouse=warehouse,
-                role=role
-            )
-        )
+        For plain Duo Push (no code, just approve on your phone), you don't
+        need any of the above -- use authenticator="snowflake" with password,
+        and Snowflake will trigger the push automatically if Duo is enabled
+        for your account/role. The connector call will block until you
+        approve or it times out.
+        """
+
+        connect_kwargs = {
+            "account": account,
+            "user": username,
+            "warehouse": warehouse,
+            "role": role,
+            "authenticator": authenticator,
+        }
+
+        if password:
+            connect_kwargs["password"] = password
+
+        if authenticator == "username_password_mfa" and passcode:
+            connect_kwargs["passcode"] = passcode
+
+        self.conn = snowflake.connector.connect(**connect_kwargs)
 
     def execute(
         self,
