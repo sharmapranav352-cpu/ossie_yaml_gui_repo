@@ -11,7 +11,7 @@ from utils.navigation import PAGES
 from utils.state import init_state
 
 st.set_page_config(
-    page_title="Semantic Model Builder | Snap Analytics",
+    page_title="Project Compass | Semantic Model Builder",
     page_icon=icon_path() or ":material/hub:",
     layout="wide",
 )
@@ -26,7 +26,7 @@ nav = st.navigation(
     ]
 )
 
-brand_block()
+brand_block(show_logo=(nav.title == "Connect"))
 progress_rail(nav.title)
 editing_banner()
 nav.run()

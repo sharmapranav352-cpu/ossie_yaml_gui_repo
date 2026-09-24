@@ -2,7 +2,9 @@
 Look and feel for the app: logo, styling, progress bar and page headers.
 
 Colours come from .streamlit/config.toml, so the brand colour is set in one
-place. The logo is read from the assets/ folder (see assets/README.md).
+place. Logos are read from the assets/ folder (see assets/README.md):
+  compass_logo  top of the front page (and the browser tab icon)
+  snap_logo     bottom-right corner of every page
 """
 
 import html
@@ -13,8 +15,9 @@ import streamlit as st
 from services.builders import validate
 from utils.navigation import BY_KEY, PAGES
 
-COMPANY = "Snap Analytics"
+PROJECT = "Project Compass"
 PRODUCT = "Semantic Model Builder"
+COMPANY = "Snap Analytics"
 
 ASSETS = Path("assets")
 
@@ -31,12 +34,20 @@ def _first_existing(*names):
     return None
 
 
-def logo_path():
-    return _first_existing("snap_logo.svg", "snap_logo.png", "snap_logo.jpg")
+def snap_logo_path():
+    return _first_existing(
+        "snap_logo.svg", "snap_logo.png", "snap_logo.webp", "snap_logo.jpg"
+    )
+
+
+def compass_logo_path():
+    return _first_existing(
+        "compass_logo.svg", "compass_logo.png", "compass_logo.webp", "compass_logo.jpg"
+    )
 
 
 def icon_path():
-    return _first_existing("snap_icon.png", "snap_icon.svg") or logo_path()
+    return _first_existing("compass_icon.png", "compass_icon.svg") or compass_logo_path()
 
 
 ##################################################
@@ -85,13 +96,33 @@ h2, h3 {{ letter-spacing: -0.005em; }}
   color: var(--ossie-muted); font-size: .9375rem; font-weight: 500;
   margin-bottom: 1.5rem;
 }}
-.ossie-brand img {{ height: 44px; width: auto; display: block; }}
+.ossie-brand img {{ height: 48px; width: auto; display: block; }}
 .ossie-brand .ossie-wordmark {{
   color: var(--ossie-ink); font-weight: 700; font-size: 1.375rem;
   letter-spacing: -0.02em;
 }}
 .ossie-brand .ossie-divider {{
   width: 1px; height: 28px; background: var(--ossie-line);
+}}
+
+/* Company logo, fixed to the bottom-right corner of every page */
+.ossie-corner {{
+  position: fixed; z-index: 999990; pointer-events: none;
+  right: 1.5rem; bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  display: flex; align-items: center;
+  padding: .375rem .625rem; border-radius: .375rem;
+  background: rgba(255, 255, 255, .92);
+}}
+.ossie-corner img {{ height: 30px; width: auto; display: block; }}
+.ossie-corner span {{
+  font-size: .8125rem; font-weight: 600; color: var(--ossie-muted);
+  letter-spacing: -0.01em;
+}}
+@media (max-width: 760px) {{
+  .ossie-brand .ossie-divider, .ossie-brand .ossie-product {{ display: none; }}
+  .ossie-brand img {{ height: 36px; }}
+  .ossie-corner {{ right: 1rem; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px)); }}
+  .ossie-corner img {{ height: 22px; }}
 }}
 
 /* Progress bar: the one signature element */
@@ -175,9 +206,15 @@ def apply_branding():
     """Call once per run, from app.py, before the page runs."""
     st.markdown(_css(), unsafe_allow_html=True)
 
-    logo = logo_path()
-    if logo:
-        st.logo(logo, size="large", icon_image=icon_path())
+    snap = snap_logo_path()
+    mark = (
+        _img_tag(snap, COMPANY) if snap
+        else f"<span>{html.escape(COMPANY)}</span>"
+    )
+    st.markdown(
+        f'<div class="ossie-corner" aria-label="{html.escape(COMPANY)}">{mark}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 ##################################################
@@ -191,22 +228,22 @@ def _img_tag(path, alt):
     mime = mimetypes.guess_type(path)[0] or "image/png"
     if path.endswith(".svg"):
         mime = "image/svg+xml"
+    elif path.endswith(".webp"):
+        mime = "image/webp"
     data = base64.b64encode(Path(path).read_bytes()).decode()
     return f'<img src="data:{mime};base64,{data}" alt="{html.escape(alt)}">'
 
 
-def brand_block():
-    """Logo (or company name) and product name, for the front page."""
-    logo = logo_path()
-    mark = (
-        _img_tag(logo, COMPANY)
-        if logo
-        else f'<span class="ossie-wordmark">{html.escape(COMPANY)}</span>'
-    )
+def brand_block(show_logo=False):
+    """Project name and product name at the top of every page.
+    On the front page, the Compass logo sits in front of the name."""
+    logo = compass_logo_path() if show_logo else None
+    mark = _img_tag(logo, PROJECT) if logo else ""
     st.markdown(
         f'<div class="ossie-brand">{mark}'
+        f'<span class="ossie-wordmark">{html.escape(PROJECT)}</span>'
         f'<span class="ossie-divider" aria-hidden="true"></span>'
-        f'<span>{html.escape(PRODUCT)}</span></div>',
+        f'<span class="ossie-product">{html.escape(PRODUCT)}</span></div>',
         unsafe_allow_html=True,
     )
 
