@@ -297,7 +297,7 @@ def continue_to(key, label=None, primary=False):
     page = BY_KEY[key]
     if st.button(
         label or f"Continue to {page['title']}",
-        key=f"continue_{key}",
+        key=f"continue_{key}_{label or page['title']}",
         type="primary" if primary else "secondary",
         icon=":material/arrow_forward:",
     ):
