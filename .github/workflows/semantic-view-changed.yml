@@ -1,0 +1,69 @@
+name: Semantic view changed
+
+# Started by Snowflake (repository_dispatch) when a semantic view changes.
+# Can also be run by hand from the Actions tab to re-export everything.
+on:
+  repository_dispatch:
+    types: [semantic_view_changed]
+  workflow_dispatch:
+    inputs:
+      database:
+        description: Snowflake database to export
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: semantic-view-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install snowflake-connector-python cryptography
+
+      - name: Export semantic views from Snowflake
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SV_DATABASE: ${{ github.event.client_payload.database || inputs.database }}
+          SV_CHANGED: ${{ toJson(github.event.client_payload.changed) }}
+          SV_DROPPED: ${{ toJson(github.event.client_payload.dropped) }}
+        run: python scripts/export_semantic_views.py
+
+      # ---- Your build goes here ------------------------------------------
+      # Anything that should run when a semantic view changes: tests,
+      # validation, deploying to another environment, notifying a channel.
+      - name: Build
+        run: |
+          echo "Changed: ${{ toJson(github.event.client_payload.changed) }}"
+          echo "Dropped: ${{ toJson(github.event.client_payload.dropped) }}"
+          ls -R semantic_views || true
+
+      - name: Open a pull request with the updated YAML
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: semantic-view-sync
+          commit-message: "Sync semantic views from Snowflake"
+          title: "Semantic views changed in Snowflake"
+          body: |
+            Started by a change detected in Snowflake.
+
+            **Database:** `${{ github.event.client_payload.database || inputs.database }}`
+            **Changed:** `${{ toJson(github.event.client_payload.changed) }}`
+            **Dropped:** `${{ toJson(github.event.client_payload.dropped) }}`
+          add-paths: semantic_views/**
+          delete-branch: true
