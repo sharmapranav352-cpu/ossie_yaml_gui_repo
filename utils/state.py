@@ -30,6 +30,8 @@ EMPTY_CONFIG = {
     "model": {
         "name": "MY_MODEL",
         "description": "Generated Semantic Model",
+        # File in outputs/ this model was opened from (None = new model)
+        "source_file": None,
     },
     "datasets": {
         "database": None,
@@ -106,6 +108,18 @@ def replace_config(data):
 
 def reset_config():
     replace_config(copy.deepcopy(EMPTY_CONFIG))
+
+
+def open_config(data, source_file):
+    """Load a parsed OSSIE file for editing and remember where it came from."""
+    replace_config(data)
+    st.session_state.saved["model"]["source_file"] = source_file
+    persist()
+    st.session_state.pop("generated_yaml", None)
+
+
+def source_file():
+    return st.session_state.saved["model"].get("source_file")
 
 
 def clear_widget_state():

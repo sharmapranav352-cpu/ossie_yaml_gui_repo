@@ -30,8 +30,14 @@ def save_yaml(
 
 def list_yamls():
 
-    return list(
-        OUTPUT_DIR.glob(
-            "*.yaml"
-        )
+    return sorted(
+        list(OUTPUT_DIR.glob("*.yaml")) + list(OUTPUT_DIR.glob("*.yml")),
+        key=lambda p: p.name.lower()
     )
+
+
+def read_yaml(filename):
+
+    path = OUTPUT_DIR / Path(filename).name
+
+    return path.read_text(encoding="utf-8") if path.exists() else None

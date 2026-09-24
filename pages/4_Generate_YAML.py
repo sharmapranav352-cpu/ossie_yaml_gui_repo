@@ -1,3 +1,4 @@
+import difflib
 import json
 import re
 
@@ -11,7 +12,7 @@ from services.builders import (
 )
 from services.yaml_service import OssieGenerator
 from utils.branding import continue_to, page_header
-from utils.file_manager import list_yamls, save_yaml
+from utils.file_manager import list_yamls, read_yaml, save_yaml
 from utils.state import (
     config_json,
     init_state,
@@ -19,6 +20,7 @@ from utils.state import (
     reset_config,
     save_section,
     seed_value,
+    source_file,
 )
 
 init_state()
@@ -45,6 +47,7 @@ with st.container(border=True):
     model_description = c2.text_input("Description", key="gen_model_desc")
 
     model_cfg = {
+        **saved["model"],
         "name": model_name.strip(),
         "description": model_description.strip(),
     }
@@ -95,12 +98,35 @@ if st.button(
 
 if "generated_yaml" in st.session_state:
 
-    safe_name = re.sub(
+    yaml_text = st.session_state.generated_yaml
+    new_name = re.sub(
         r"[^A-Za-z0-9_.-]", "_",
         st.session_state.get("generated_for") or "model"
-    )
-    filename = f"{safe_name}.yaml"
-    yaml_text = st.session_state.generated_yaml
+    ) + ".yaml"
+
+    current_file = source_file()
+
+    # Editing an existing file: update it, or save a copy under a new name
+    if current_file:
+        mode = st.radio(
+            "Save as",
+            [f"Update {current_file}", "Save as a new file"],
+            horizontal=True,
+            key="gen_save_mode",
+        )
+        if mode == "Save as a new file":
+            filename = st.text_input(
+                "New file name", value=new_name, key="gen_new_filename"
+            ).strip() or new_name
+            filename = re.sub(r"[^A-Za-z0-9_.-]", "_", filename.replace("\\", "/").split("/")[-1])
+            if not filename.endswith((".yaml", ".yml")):
+                filename += ".yaml"
+        else:
+            filename = current_file
+    else:
+        filename = new_name
+
+    existing = read_yaml(filename)
 
     with st.container(border=True):
 
@@ -125,13 +151,49 @@ if "generated_yaml" in st.session_state:
             )
 
         with h3:
+            label = (
+                "Update file" if existing is not None and filename == current_file
+                else "Save to outputs"
+            )
             if st.button(
-                "Save to outputs",
+                label,
                 icon=":material/save:",
-                use_container_width=True
+                use_container_width=True,
+                disabled=existing == yaml_text,
+                help="The file already matches." if existing == yaml_text else None,
             ):
+                if existing is not None and filename != current_file:
+                    st.warning(
+                        f"outputs/{filename} already exists and was overwritten."
+                    )
                 save_yaml(filename, yaml_text)
+                # From now on, this is the file being edited
+                save_section("model", {**st.session_state.saved["model"],
+                                       "source_file": filename})
                 st.toast(f"Saved outputs/{filename}")
+                existing = yaml_text
+
+        if existing is not None:
+            if existing == yaml_text:
+                st.caption(f"outputs/{filename} is up to date.")
+            else:
+                diff = "".join(difflib.unified_diff(
+                    existing.splitlines(keepends=True),
+                    yaml_text.splitlines(keepends=True),
+                    fromfile=f"outputs/{filename} (current)",
+                    tofile=f"outputs/{filename} (new)",
+                ))
+                added = sum(1 for l in diff.splitlines()
+                            if l.startswith("+") and not l.startswith("+++"))
+                removed = sum(1 for l in diff.splitlines()
+                              if l.startswith("-") and not l.startswith("---"))
+                with st.expander(
+                    f"Changes compared with outputs/{filename}: "
+                    f"{added} line{'' if added == 1 else 's'} added, "
+                    f"{removed} removed",
+                    expanded=bool(current_file and filename == current_file),
+                ):
+                    st.code(diff, language="diff", height=360)
 
         st.code(yaml_text, language="yaml", height=520)
 
