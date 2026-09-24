@@ -1,6 +1,6 @@
 # Semantic Model Builder
 
-A Streamlit app by Snap Analytics that builds an OSSIE semantic model YAML
+A Streamlit app by Pranav that builds an OSSIE semantic model YAML
 from Snowflake tables, in five steps: connect, choose datasets, define
 relationships, add metrics, and generate the YAML.
 
