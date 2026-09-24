@@ -1,15 +1,14 @@
-name: Semantic view changed
+name: Semantic view sync
 
-# Started by Snowflake (repository_dispatch) when a semantic view changes.
-# Can also be run by hand from the Actions tab to re-export everything.
+# Checks Snowflake on a schedule. If any semantic view was created, changed
+# or dropped, it runs the build and opens a pull request with the new YAML.
+#
+# Set the database in: Settings > Secrets and variables > Actions >
+# Variables > SV_DATABASE
 on:
-  repository_dispatch:
-    types: [semantic_view_changed]
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 minutes (UTC)
   workflow_dispatch:
-    inputs:
-      database:
-        description: Snowflake database to export
-        required: true
 
 permissions:
   contents: write
@@ -33,37 +32,41 @@ jobs:
         run: pip install snowflake-connector-python cryptography
 
       - name: Export semantic views from Snowflake
+        id: export
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
           SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
           SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SV_DATABASE: ${{ github.event.client_payload.database || inputs.database }}
-          SV_CHANGED: ${{ toJson(github.event.client_payload.changed) }}
-          SV_DROPPED: ${{ toJson(github.event.client_payload.dropped) }}
+          SV_DATABASE: ${{ vars.SV_DATABASE }}
         run: python scripts/export_semantic_views.py
 
-      # ---- Your build goes here ------------------------------------------
-      # Anything that should run when a semantic view changes: tests,
-      # validation, deploying to another environment, notifying a channel.
+      - name: No changes
+        if: steps.export.outputs.changed != 'true'
+        run: echo "No semantic views changed since the last sync."
+
+      # ---- Your build goes here --------------------------------------------
+      # Runs only when something changed: tests, validation, deploying to
+      # another environment, notifying a channel, etc.
       - name: Build
+        if: steps.export.outputs.changed == 'true'
         run: |
-          echo "Changed: ${{ toJson(github.event.client_payload.changed) }}"
-          echo "Dropped: ${{ toJson(github.event.client_payload.dropped) }}"
-          ls -R semantic_views || true
+          echo "Changed or new: ${{ steps.export.outputs.changed_views }}"
+          echo "Dropped:        ${{ steps.export.outputs.dropped_views }}"
 
       - name: Open a pull request with the updated YAML
+        if: steps.export.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
           branch: semantic-view-sync
           commit-message: "Sync semantic views from Snowflake"
           title: "Semantic views changed in Snowflake"
           body: |
-            Started by a change detected in Snowflake.
+            Detected by the scheduled sync.
 
-            **Database:** `${{ github.event.client_payload.database || inputs.database }}`
-            **Changed:** `${{ toJson(github.event.client_payload.changed) }}`
-            **Dropped:** `${{ toJson(github.event.client_payload.dropped) }}`
+            **Database:** `${{ vars.SV_DATABASE }}`
+            **Changed or new:** ${{ steps.export.outputs.changed_views }}
+            **Dropped:** ${{ steps.export.outputs.dropped_views }}
           add-paths: semantic_views/**
           delete-branch: true

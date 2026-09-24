@@ -1,18 +1,18 @@
 """
-Export Snowflake semantic views to YAML files in semantic_views/.
+Export every semantic view in a Snowflake database to
+semantic_views/<database>/<schema>/<view>.yaml, and report what changed.
 
-Called by .github/workflows/semantic-view-changed.yml.
+The YAML files already in the repo are the "last known" state, so a view
+counts as changed when its exported YAML differs from the file on disk.
+Files for views that no longer exist are deleted.
 
 Environment variables:
   SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PRIVATE_KEY (PEM text),
-  SNOWFLAKE_ROLE, SNOWFLAKE_WAREHOUSE
-  SV_DATABASE  database to export
-  SV_CHANGED   JSON list of fully qualified view names that changed;
-               "null" or empty means export every view in SV_DATABASE
-  SV_DROPPED   JSON list of fully qualified view names that were dropped
+  SNOWFLAKE_ROLE, SNOWFLAKE_WAREHOUSE, SV_DATABASE
+
+Writes changed / changed_views / dropped_views to $GITHUB_OUTPUT.
 """
 
-import json
 import os
 from pathlib import Path
 
@@ -25,39 +25,6 @@ OUT_DIR = Path("semantic_views")
 # your account supports (see SYSTEM$READ_OSSIE_YAML_FROM_SEMANTIC_VIEW in
 # the Snowflake docs).
 EXPORT_FUNCTION = "SYSTEM$READ_YAML_FROM_SEMANTIC_VIEW"
-
-
-def json_list(name):
-    raw = os.environ.get(name, "").strip()
-    if not raw or raw == "null":
-        return None
-    return json.loads(raw)
-
-
-def split_fqn(fqn):
-    """'"DB"."SCHEMA"."VIEW"' -> ('DB', 'SCHEMA', 'VIEW')"""
-    parts, buf, in_quotes, i = [], "", False, 0
-    while i < len(fqn):
-        ch = fqn[i]
-        if ch == '"':
-            if in_quotes and i + 1 < len(fqn) and fqn[i + 1] == '"':
-                buf += '"'
-                i += 1
-            else:
-                in_quotes = not in_quotes
-        elif ch == "." and not in_quotes:
-            parts.append(buf)
-            buf = ""
-        else:
-            buf += ch
-        i += 1
-    parts.append(buf)
-    return tuple(parts)
-
-
-def file_for(fqn):
-    db, schema, view = split_fqn(fqn)
-    return OUT_DIR / db / schema / f"{view}.yaml"
 
 
 def q(name):
@@ -81,42 +48,64 @@ def connect():
     )
 
 
+def set_output(name, value):
+    path = os.environ.get("GITHUB_OUTPUT")
+    if path:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(f"{name}={value}\n")
+
+
 def main():
-    database = os.environ["SV_DATABASE"]
-    changed = json_list("SV_CHANGED")
-    dropped = json_list("SV_DROPPED") or []
+    database = os.environ.get("SV_DATABASE", "").strip()
+    if not database:
+        raise SystemExit(
+            "SV_DATABASE is not set. Add it under Settings > Secrets and "
+            "variables > Actions > Variables."
+        )
+
+    db_dir = OUT_DIR / database
+    before = {p for p in db_dir.rglob("*.yaml")} if db_dir.exists() else set()
+
+    changed, seen = [], set()
 
     conn = connect()
     cur = conn.cursor()
-
     try:
-        if changed is None:
-            # Manual run: export everything in the database
-            cur.execute(f"SHOW SEMANTIC VIEWS IN DATABASE {q(database)}")
-            cols = [c[0].lower() for c in cur.description]
-            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
-            changed = [
-                f'{q(r["database_name"])}.{q(r["schema_name"])}.{q(r["name"])}'
-                for r in rows
-            ]
+        cur.execute(f"SHOW SEMANTIC VIEWS IN DATABASE {q(database)}")
+        cols = [c[0].lower() for c in cur.description]
+        views = [dict(zip(cols, r)) for r in cur.fetchall()]
+        print(f"Found {len(views)} semantic view(s) in {database}")
 
-        for fqn in changed:
+        for v in views:
+            fqn = f'{q(v["database_name"])}.{q(v["schema_name"])}.{q(v["name"])}'
             cur.execute(f"SELECT {EXPORT_FUNCTION}(%s)", (fqn,))
             spec = cur.fetchone()[0]
-            path = file_for(fqn)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(spec, encoding="utf-8")
-            print(f"Exported {fqn} -> {path}")
 
-        for fqn in dropped:
-            path = file_for(fqn)
-            if path.exists():
-                path.unlink()
-                print(f"Removed {path} ({fqn} was dropped)")
+            path = OUT_DIR / v["database_name"] / v["schema_name"] / f'{v["name"]}.yaml'
+            seen.add(path)
 
+            old = path.read_text(encoding="utf-8") if path.exists() else None
+            if old != spec:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(spec, encoding="utf-8")
+                changed.append(f'{v["schema_name"]}.{v["name"]}')
+                print(f"{'Updated' if old is not None else 'New'}: {fqn}")
     finally:
         cur.close()
         conn.close()
+
+    dropped = []
+    for path in sorted(before - seen):
+        path.unlink()
+        dropped.append(f"{path.parent.name}.{path.stem}")
+        print(f"Dropped: {path}")
+
+    any_change = bool(changed or dropped)
+    set_output("changed", "true" if any_change else "false")
+    set_output("changed_views", ", ".join(changed) or "none")
+    set_output("dropped_views", ", ".join(dropped) or "none")
+
+    print(f"Changed or new: {len(changed)}, dropped: {len(dropped)}")
 
 
 if __name__ == "__main__":
