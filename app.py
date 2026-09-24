@@ -1,6 +1,12 @@
 import streamlit as st
 
-from utils.branding import apply_branding, brand_block, icon_path, progress_rail
+from utils.branding import (
+    apply_branding,
+    brand_block,
+    editing_banner,
+    icon_path,
+    progress_rail,
+)
 from utils.navigation import PAGES
 from utils.state import init_state
 
@@ -22,4 +28,5 @@ nav = st.navigation(
 
 brand_block()
 progress_rail(nav.title)
+editing_banner()
 nav.run()

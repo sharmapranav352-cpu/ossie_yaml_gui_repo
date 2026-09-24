@@ -152,6 +152,15 @@ h2, h3 {{ letter-spacing: -0.005em; }}
   .ossie-conn {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
 }}
 
+/* "Editing <file>" indicator */
+.ossie-editing {{
+  margin: -1.5rem 0 1.5rem; font-size: .875rem; color: var(--ossie-muted);
+}}
+.ossie-editing code {{
+  font-size: .8125rem; padding: .1rem .375rem; border-radius: .25rem;
+  background: var(--ossie-surface); color: var(--ossie-ink);
+}}
+
 /* Quieter expanders and code */
 [data-testid="stExpander"] summary p {{ font-weight: 500; }}
 
@@ -287,6 +296,16 @@ def progress_rail(current_title):
         '<ol class="ossie-rail" aria-label="Progress">' + "".join(items) + "</ol>",
         unsafe_allow_html=True,
     )
+
+
+def editing_banner():
+    """Shows which existing file is open, on every page."""
+    src = st.session_state.saved["model"].get("source_file")
+    if src:
+        st.markdown(
+            f'<div class="ossie-editing">Editing <code>outputs/{html.escape(src)}</code></div>',
+            unsafe_allow_html=True,
+        )
 
 
 ##################################################

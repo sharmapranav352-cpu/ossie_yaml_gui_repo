@@ -2,9 +2,11 @@ import html
 
 import streamlit as st
 
+from services.ossie_import import OssieImportError, parse_ossie_yaml
 from services.snowflake_service import SnowflakeService
 from utils.branding import continue_to, page_header
-from utils.state import init_state
+from utils.file_manager import list_yamls, read_yaml
+from utils.state import init_state, open_config, reset_config, source_file
 
 AUTH_METHODS = {
     "Programmatic access token": {
@@ -43,6 +45,95 @@ AUTH_METHODS = {
         "help": "For accounts without MFA.",
     },
 }
+
+
+##################################################
+# OPEN AN EXISTING MODEL
+##################################################
+
+def open_model_section():
+
+    st.write("")
+
+    with st.container(border=True):
+
+        current = source_file()
+        has_work = bool(st.session_state.saved["datasets"]["tables"])
+
+        st.subheader("Start from an existing model")
+
+        if current:
+            st.markdown(
+                f"You're editing **outputs/{current}**. Change it on the "
+                "Datasets, Relationships and Metrics pages, then update the "
+                "file on the Generate YAML page."
+            )
+        else:
+            st.caption(
+                "Open an OSSIE YAML file to change it, instead of building a "
+                "model from scratch."
+            )
+
+        files = [f.name for f in list_yamls()]
+        tab_repo, tab_upload = st.tabs(["From the repo", "Upload a file"])
+
+        with tab_repo:
+            if files:
+                c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
+                choice = c1.selectbox(
+                    "File in outputs/",
+                    files,
+                    index=files.index(current) if current in files else 0,
+                    key="open_repo_choice",
+                )
+                if c2.button("Open", key="open_repo_btn", use_container_width=True):
+                    _open(read_yaml(choice), choice)
+            else:
+                st.caption("No YAML files in outputs/ yet.")
+
+        with tab_upload:
+            upload = st.file_uploader(
+                "OSSIE YAML file", type=["yaml", "yml"], key="open_upload"
+            )
+            if upload is not None and st.button("Open", key="open_upload_btn"):
+                _open(upload.getvalue().decode("utf-8"), upload.name)
+
+        if has_work and not current:
+            st.caption(
+                "Opening a file replaces the model you're working on now."
+            )
+
+        notes = st.session_state.get("import_notes")
+        if notes:
+            with st.expander(f"{len(notes)} note(s) from opening the file", expanded=True):
+                for n in notes:
+                    st.markdown(f"- {n}")
+
+        if current:
+            c1, c2, _ = st.columns([1.4, 1.4, 2.2])
+            with c1:
+                continue_to("datasets", "Edit datasets", primary=True)
+            with c2:
+                if st.button("Start a new model", use_container_width=True):
+                    reset_config()
+                    st.session_state.pop("import_notes", None)
+                    st.rerun()
+
+
+def _open(text, filename):
+    if text is None:
+        st.error(f"Couldn't read outputs/{filename}.")
+        return
+    try:
+        cfg, notes = parse_ossie_yaml(text)
+    except OssieImportError as exc:
+        st.error(str(exc))
+        return
+    open_config(cfg, filename)
+    st.session_state.import_notes = notes
+    st.toast(f"Opened {filename}")
+    st.rerun()
+
 
 init_state()
 
@@ -92,6 +183,7 @@ if st.session_state.snowflake and conn:
                 st.session_state.meta_cache = {}
                 st.rerun()
 
+    open_model_section()
     st.stop()
 
 ##################################################
@@ -167,10 +259,10 @@ with st.container(border=True):
                 st.session_state.meta_cache = {}
                 st.rerun()
 
-saved = st.session_state.saved
-if saved["datasets"]["tables"]:
+open_model_section()
+
+if st.session_state.saved["datasets"]["tables"]:
     st.caption(
-        "Your last saved model is still here. You can review relationships, "
-        "metrics and the YAML without connecting; editing datasets needs a "
-        "connection."
+        "Your saved model is still here. You can edit relationships, metrics "
+        "and the YAML without connecting; editing datasets needs a connection."
     )
