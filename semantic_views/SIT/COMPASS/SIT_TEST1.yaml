@@ -1,0 +1,137 @@
+name: SIT_TEST1
+description: Semantic View created for testing the OSSIE YAML setup.
+tables:
+  - name: CUSTOMER
+    base_table:
+      database: SIT
+      schema: COMPASS
+      table: CUSTOMER
+    primary_key:
+      columns:
+        - C_CUSTKEY
+    dimensions:
+      - name: C_CUSTKEY
+        expr: C_CUSTKEY
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: C_NAME
+        expr: C_NAME
+        data_type: VARCHAR(25)
+        access_modifier: public_access
+      - name: C_NATIONKEY
+        expr: C_NATIONKEY
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+  - name: LINEITEM
+    base_table:
+      database: SIT
+      schema: COMPASS
+      table: LINEITEM
+    dimensions:
+      - name: L_LINENUMBER
+        expr: L_LINENUMBER
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: L_LINESTATUS
+        expr: L_LINESTATUS
+        data_type: VARCHAR(1)
+        access_modifier: public_access
+      - name: L_ORDERKEY
+        expr: L_ORDERKEY
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+    facts:
+      - name: L_EXTENDEDPRICE
+        expr: L_EXTENDEDPRICE
+        data_type: "NUMBER(12,2)"
+        access_modifier: public_access
+      - name: L_QUANTITY
+        expr: L_QUANTITY
+        data_type: "NUMBER(12,2)"
+        access_modifier: public_access
+  - name: NATION
+    base_table:
+      database: SIT
+      schema: COMPASS
+      table: NATION
+    primary_key:
+      columns:
+        - N_NATIONKEY
+    dimensions:
+      - name: N_NAME
+        expr: N_NAME
+        data_type: VARCHAR(25)
+        access_modifier: public_access
+      - name: N_NATIONKEY
+        expr: N_NATIONKEY
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: N_REGIONKEY
+        expr: N_REGIONKEY
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+  - name: ORDERS
+    base_table:
+      database: SIT
+      schema: COMPASS
+      table: ORDERS
+    primary_key:
+      columns:
+        - O_ORDERKEY
+    dimensions:
+      - name: O_CUSTKEY
+        expr: O_CUSTKEY
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: O_ORDERDATE
+        expr: O_ORDERDATE
+        data_type: DATE
+        access_modifier: public_access
+      - name: O_ORDERKEY
+        expr: O_ORDERKEY
+        data_type: "NUMBER(38,0)"
+        access_modifier: public_access
+      - name: O_ORDERSTATUS
+        expr: O_ORDERSTATUS
+        data_type: VARCHAR(1)
+        access_modifier: public_access
+    facts:
+      - name: O_TOTALPRICE
+        expr: O_TOTALPRICE
+        data_type: "NUMBER(12,2)"
+        access_modifier: public_access
+metrics:
+  - name: AVERAGE_PRICE_PER_UNIT
+    synonyms: []
+    description: The TOTAL_PRICE metric divided by TOTAL_QUANTITY.
+    expr: TOTAL_PRICE / TOTAL_QUANTITY
+    access_modifier: public_access
+  - name: TOTAL_PRICE
+    synonyms: []
+    description: The sum of o_totalprice field from the ORDERS table.
+    expr: SUM(orders.o_totalprice)
+    access_modifier: public_access
+  - name: TOTAL_QUANTITY
+    synonyms: []
+    description: The sum of the l_quantity field in the LINEITEM table.
+    expr: AVG(lineitem.l_quantity)
+    access_modifier: public_access
+relationships:
+  - name: CUSTOMER_TO_NATION
+    left_table: CUSTOMER
+    right_table: NATION
+    relationship_columns:
+      - left_column: C_NATIONKEY
+        right_column: N_NATIONKEY
+  - name: LINEITEM_TO_ORDERS
+    left_table: LINEITEM
+    right_table: ORDERS
+    relationship_columns:
+      - left_column: L_ORDERKEY
+        right_column: O_ORDERKEY
+  - name: ORDERS_TO_CUSTOMER
+    left_table: ORDERS
+    right_table: CUSTOMER
+    relationship_columns:
+      - left_column: O_CUSTKEY
+        right_column: C_CUSTKEY
