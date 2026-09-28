@@ -281,6 +281,7 @@ def brand_block(show_logo=False):
         conn_pill = (
             '<span class="cx-pill is-ok"><span class="cx-dot"></span>'
             f'Snowflake <b>{html.escape(conn["account"])}</b></span>'
+            f'<span class="cx-pill">User <b>{html.escape(conn["username"])}</b></span>'
         )
     else:
         conn_pill = '<span class="cx-pill"><span class="cx-dot"></span>Not connected</span>'
