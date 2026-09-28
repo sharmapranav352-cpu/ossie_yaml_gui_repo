@@ -1,12 +1,6 @@
 import streamlit as st
 
-from utils.branding import (
-    apply_branding,
-    brand_block,
-    editing_banner,
-    icon_path,
-    progress_rail,
-)
+from utils.branding import apply_branding, brand_block, icon_path, progress_rail
 from utils.navigation import PAGES
 from utils.state import init_state
 
@@ -23,10 +17,10 @@ nav = st.navigation(
     [
         st.Page(p["path"], title=p["title"], icon=p["icon"], default=(i == 0))
         for i, p in enumerate(PAGES)
-    ]
+    ],
+    position="hidden",  # the step bar below is the navigation
 )
 
 brand_block(show_logo=(nav.title == "Connect"))
 progress_rail(nav.title)
-editing_banner()
 nav.run()

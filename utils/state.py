@@ -170,6 +170,40 @@ def seed_value(key, saved):
 
 
 ##################################################
+# ADD / DELETE ROWS (relationships, metrics)
+##################################################
+
+def row_ids(prefix, saved_rows):
+    """
+    Stable ids for a list of editable rows, so deleting a row in the middle
+    doesn't shift the other rows' widgets. Returns (ids, seeds) where
+    seeds[id] is the saved row that id started from ({} for new rows).
+    All keys start with `prefix`, so opening another file clears them.
+    """
+    ids_key, seed_key, next_key = f"{prefix}ids", f"{prefix}seed", f"{prefix}next"
+
+    if ids_key not in st.session_state:
+        ids = [f"r{i}" for i in range(len(saved_rows))]
+        st.session_state[ids_key] = ids
+        st.session_state[seed_key] = dict(zip(ids, saved_rows))
+        st.session_state[next_key] = len(saved_rows)
+
+    return st.session_state[ids_key], st.session_state[seed_key]
+
+
+def add_row(prefix):
+    n = st.session_state.get(f"{prefix}next", 0)
+    st.session_state[f"{prefix}next"] = n + 1
+    st.session_state[f"{prefix}ids"] = st.session_state.get(f"{prefix}ids", []) + [f"r{n}"]
+
+
+def delete_row(prefix, row_id):
+    st.session_state[f"{prefix}ids"] = [
+        r for r in st.session_state.get(f"{prefix}ids", []) if r != row_id
+    ]
+
+
+##################################################
 # SNOWFLAKE METADATA CACHE
 ##################################################
 
@@ -193,30 +227,33 @@ def clear_meta_cache():
 ##################################################
 
 def save_bar(label, current, saved, on_save, next_step=None):
-    """Save button, a quiet saved/unsaved status, and an optional next step."""
+    """Bottom action bar: Save and its status on the left, Continue on the right."""
     from utils.branding import continue_to
 
-    col1, col2, col3 = st.columns([1.1, 2.4, 1.5], vertical_alignment="center")
+    with st.container(key="cx-actions"):
+        col1, col2, col3 = st.columns([1.1, 2.9, 1.4], vertical_alignment="center")
 
-    with col1:
-        clicked = st.button(
-            label, type="primary", icon=":material/save:",
-            use_container_width=True
-        )
+        with col1:
+            clicked = st.button(
+                label, type="primary", icon=":material/save:",
+                width="stretch", key="cx-save"
+            )
 
-    if clicked:
-        on_save(current)
-        saved = current
-        st.toast(f"{label.replace('Save ', '').capitalize()} saved")
+        if clicked:
+            on_save(current)
+            saved = current
+            st.toast(f"{label.replace('Save ', '').capitalize()} saved")
 
-    with col2:
-        if current != saved:
-            st.markdown(":orange[:material/pending: Unsaved changes]")
-        elif saved:
-            st.markdown(":green[:material/check_circle: All changes saved]")
+        with col2:
+            if current != saved:
+                st.markdown(
+                    ":orange[:material/pending: Unsaved changes]",
+                )
+            elif saved:
+                st.markdown(":green[:material/check_circle: All changes saved]")
 
-    if next_step:
-        with col3:
-            continue_to(*next_step)
+        if next_step:
+            with col3:
+                continue_to(*next_step)
 
     return clicked
