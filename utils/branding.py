@@ -96,7 +96,7 @@ h2, h3 {{ letter-spacing: -0.005em; }}
   color: var(--ossie-muted); font-size: .9375rem; font-weight: 500;
   margin-bottom: 1.5rem;
 }}
-.ossie-brand img {{ height: 48px; width: auto; display: block; }}
+.ossie-brand img {{ height: 64px; width: auto; display: block; }}
 .ossie-brand .ossie-wordmark {{
   color: var(--ossie-ink); font-weight: 700; font-size: 1.375rem;
   letter-spacing: -0.02em;
@@ -113,16 +113,16 @@ h2, h3 {{ letter-spacing: -0.005em; }}
   padding: .375rem .625rem; border-radius: .375rem;
   background: rgba(255, 255, 255, .92);
 }}
-.ossie-corner img {{ height: 30px; width: auto; display: block; }}
+.ossie-corner img {{ height: 22px; width: auto; display: block; }}
 .ossie-corner span {{
   font-size: .8125rem; font-weight: 600; color: var(--ossie-muted);
   letter-spacing: -0.01em;
 }}
 @media (max-width: 760px) {{
   .ossie-brand .ossie-divider, .ossie-brand .ossie-product {{ display: none; }}
-  .ossie-brand img {{ height: 36px; }}
+  .ossie-brand img {{ height: 44px; }}
   .ossie-corner {{ right: 1rem; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px)); }}
-  .ossie-corner img {{ height: 22px; }}
+  .ossie-corner img {{ height: 16px; }}
 }}
 
 /* Progress bar: the one signature element */
