@@ -218,4 +218,5 @@ save_bar(
     saved_cfg if has_work else current,
     lambda cfg: save_section("datasets", cfg),
     next_step=("relationships", "Continue to relationships") if has_work else None,
+    back_step="connect",
 )

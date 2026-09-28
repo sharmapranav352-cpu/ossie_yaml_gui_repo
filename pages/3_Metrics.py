@@ -158,4 +158,5 @@ save_bar(
         st.session_state.__setitem__("met_seed", dict(zip(ids, cfg))),
     ),
     next_step=("publish", "Continue to publish"),
+    back_step="relationships",
 )
