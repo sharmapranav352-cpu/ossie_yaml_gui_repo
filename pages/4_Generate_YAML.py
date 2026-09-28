@@ -10,6 +10,7 @@ from services.builders import (
     build_relationships,
     validate,
 )
+from services import github_service
 from services.yaml_service import OssieGenerator
 from utils.branding import continue_to, page_header
 from utils.file_manager import list_yamls, read_yaml, save_yaml
@@ -95,6 +96,7 @@ if st.button(
         metrics=build_metrics(saved["metrics"]),
     )
     st.session_state.generated_for = model_cfg["name"]
+    st.session_state.pop("gh_result", None)
 
 if "generated_yaml" in st.session_state:
 
@@ -172,6 +174,88 @@ if "generated_yaml" in st.session_state:
                                        "source_file": filename})
                 st.toast(f"Saved outputs/{filename}")
                 existing = yaml_text
+
+        #################################################
+        # SAVE TO GITHUB
+        #################################################
+
+        gh = github_service.settings()
+
+        if gh:
+            modes = {
+                "Open a pull request": "pull_request",
+                f"Commit straight to {gh['branch']}": "direct",
+            }
+            default = 1 if gh["mode"] == "direct" else 0
+
+            g1, g2 = st.columns([1.3, 2], vertical_alignment="bottom")
+            gh_mode = g1.radio(
+                f"Save to GitHub ({gh['repo'].split('/')[-1]})",
+                list(modes),
+                index=default,
+                key="gen_gh_mode",
+                help=(
+                    "A pull request lets you review the change on GitHub "
+                    "before it reaches the repo. Committing straight to the "
+                    "branch saves it immediately."
+                ),
+            )
+            action = "Update" if filename == current_file else "Add"
+            gh_message = g2.text_input(
+                "Commit message",
+                value=f"{action} {gh['folder']}/{filename}",
+                key=f"gen_gh_msg_{filename}",
+            )
+
+            if st.button(
+                "Save to GitHub",
+                icon=":material/cloud_upload:",
+                key="gen_gh_save",
+            ):
+                with st.spinner("Saving to GitHub..."):
+                    try:
+                        # Keep the local copy in step with what goes to GitHub
+                        save_yaml(filename, yaml_text)
+                        save_section("model", {**st.session_state.saved["model"],
+                                               "source_file": filename})
+                        existing = yaml_text
+                        st.session_state.gh_result = github_service.save_file(
+                            filename, yaml_text,
+                            message=gh_message.strip() or None,
+                            mode=modes[gh_mode],
+                        )
+                    except github_service.GitHubError as exc:
+                        st.session_state.gh_result = {"status": "error", "error": str(exc)}
+                    except Exception as exc:
+                        st.session_state.gh_result = {
+                            "status": "error",
+                            "error": f"Couldn't reach GitHub: {exc}",
+                        }
+
+            result = st.session_state.get("gh_result")
+            if result:
+                if result["status"] == "error":
+                    st.error(result["error"])
+                elif result["status"] == "unchanged":
+                    st.info(
+                        f"{result['path']} on GitHub already matches this "
+                        f"YAML. [View it on GitHub]({result['url']})"
+                    )
+                elif result["status"] == "pull_request":
+                    st.success(
+                        f"Pull request opened for {result['path']}. "
+                        f"[Review and merge it on GitHub]({result['url']})"
+                    )
+                else:
+                    st.success(
+                        f"Committed {result['path']} to GitHub. "
+                        f"[View the commit]({result['url']})"
+                    )
+        else:
+            st.caption(
+                "To save straight to GitHub, add a GitHub token to the app's "
+                "secrets (see README)."
+            )
 
         if existing is not None:
             if existing == yaml_text:

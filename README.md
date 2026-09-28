@@ -18,3 +18,24 @@ streamlit run app.py
   corner of every page. See `assets/README.md`.
 - Colours and fonts: `.streamlit/config.toml`. Change `primaryColor` to
   restyle every accent in the app.
+
+## Saving YAML to GitHub
+
+The Generate YAML page can save the file straight into this repository
+(`outputs/`), either as a pull request or as a direct commit.
+
+1. Create a fine-grained GitHub token for this repository only, with
+   **Contents** and **Pull requests** set to **Read and write**.
+2. Add it to the app's secrets. Locally, in `.streamlit/secrets.toml`
+   (git-ignored); on Streamlit Cloud, under App settings > Secrets:
+
+   ```toml
+   [github]
+   token  = "github_pat_..."
+   repo   = "sharmapranav352-cpu/ossie_yaml_gui_repo"
+   branch = "main"
+   folder = "outputs"
+   mode   = "pull_request"   # or "direct"
+   ```
+
+Never commit the token to the repository.
