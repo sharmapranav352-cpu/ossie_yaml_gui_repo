@@ -61,3 +61,29 @@ Setup, in this repo's Settings > Secrets and variables > Actions:
   Pull requests set to Read and write.
 - Optional variable `CONTRACTS_SYNC_MODE`: `pull_request` (default) or
   `direct` to commit straight to that repo's `main`.
+
+## Sync status on the Publish page
+
+After you publish, the Publish page follows the file through both
+repositories and refreshes by itself until they match:
+
+1. Saved in ossie_yaml_gui_repo (waits for your pull request, if you opened one)
+2. Sync workflow (queued, running, finished or failed, with a link to the run)
+3. Updated in ossie-semantic-contracts (waits for its pull request, if the
+   sync opened one)
+
+"In sync" means the file on both main branches is exactly the YAML you
+published. Select **Check now** to see where the current version is at any time.
+
+Token permissions:
+
+- The app's `[github] token` also needs **Actions: Read** on this repository
+  to show the sync workflow's progress. Without it the tracker still works,
+  but step 2 only shows "Running".
+- If ossie-semantic-contracts is private, add a read-only token for it
+  (Contents: Read, Pull requests: Read) as `contracts_token` under `[github]`.
+  The app never writes to that repository.
+
+The app's pages live in `views/` (not `pages/`), so that refreshing the browser
+on any page keeps the header and step navigation.
+

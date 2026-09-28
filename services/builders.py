@@ -207,7 +207,9 @@ def validate(saved):
                 errors.append(f"{label} has an empty custom expression.")
         else:
             table = metric.get("table")
-            if table not in columns:
+            if not table or not metric.get("column"):
+                errors.append(f"{label}: choose a dataset and column.")
+            elif table not in columns:
                 errors.append(
                     f"{label}: table {table} is not a saved dataset."
                 )
