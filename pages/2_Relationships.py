@@ -146,4 +146,5 @@ save_bar(
         st.session_state.__setitem__("rel_seed", dict(zip(ids, cfg))),
     ),
     next_step=("metrics", "Continue to metrics"),
+    back_step="datasets",
 )

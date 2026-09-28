@@ -12,7 +12,7 @@ from services.builders import (
     validate,
 )
 from services.yaml_service import OssieGenerator
-from utils.branding import continue_to, page_header
+from utils.branding import continue_to, nav_bar, page_header
 from utils.file_manager import (
     EXPECTED_MODEL_NAME,
     FIXED_OUTPUT_FILE,
@@ -319,3 +319,5 @@ with st.expander("Advanced: export, load or reset the configuration"):
         if st.button("Clear everything", disabled=not confirm):
             reset_config()
             st.rerun()
+
+nav_bar(back="metrics")

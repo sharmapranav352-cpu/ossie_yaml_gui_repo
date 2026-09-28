@@ -226,12 +226,18 @@ def clear_meta_cache():
 # UI HELPERS
 ##################################################
 
-def save_bar(label, current, saved, on_save, next_step=None):
-    """Bottom action bar: Save and its status on the left, Continue on the right."""
-    from utils.branding import continue_to
+def save_bar(label, current, saved, on_save, next_step=None, back_step=None):
+    """Bottom action bar: Back, Save and its status on the left; Continue on the right."""
+    from utils.branding import continue_to, go_back
 
     with st.container(key="cx-actions"):
-        col1, col2, col3 = st.columns([1.1, 2.9, 1.4], vertical_alignment="center")
+        col0, col1, col2, col3 = st.columns(
+            [1.35, 1.2, 1.7, 1.45], vertical_alignment="center"
+        )
+
+        if back_step:
+            with col0:
+                go_back(back_step)
 
         with col1:
             clicked = st.button(

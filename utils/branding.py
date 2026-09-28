@@ -138,7 +138,10 @@ h2, h3 {{ letter-spacing: -0.005em; }}
   padding: .25rem .25rem .125rem 0; background: transparent !important;
   border-radius: .25rem;
 }}
-[class*="st-key-cx-step-"] [data-testid="stPageLink"] a:hover span {{ color: var(--cx-primary); }}
+[class*="st-key-cx-step-"] [data-testid="stPageLink"] a {{ cursor: pointer; }}
+[class*="st-key-cx-step-"] [data-testid="stPageLink"] a:hover p {{
+  color: var(--cx-primary); text-decoration: underline; text-underline-offset: 3px;
+}}
 [class*="st-key-cx-step-"] [data-testid="stPageLink"] p {{
   font-weight: 600; font-size: .9375rem; color: var(--cx-ink);
   white-space: nowrap;
@@ -350,6 +353,29 @@ def progress_rail(current_title):
 ##################################################
 # ACTIONS
 ##################################################
+
+def go_back(key, label=None, full_width=True):
+    page = BY_KEY[key]
+    if st.button(
+        label or f"Back to {page['title']}",
+        key=f"back_{key}",
+        icon=":material/arrow_back:",
+        width="stretch" if full_width else "content",
+    ):
+        st.switch_page(page["path"])
+
+
+def nav_bar(back=None, forward=None):
+    """Bottom bar for pages without a Save button: Back left, Continue right."""
+    with st.container(key="cx-actions"):
+        left, _, right = st.columns([1.35, 2.9, 1.45], vertical_alignment="center")
+        if back:
+            with left:
+                go_back(back)
+        if forward:
+            with right:
+                continue_to(*forward)
+
 
 def continue_to(key, label=None, primary=False, full_width=True):
     page = BY_KEY[key]
