@@ -138,7 +138,7 @@ def _open(text, filename):
 init_state()
 
 page_header(
-    "Build a Snowflake semantic model",
+    "Build a semantic model",
     "Pick the tables your analysts use, describe how they join, define "
     "the business metrics, and export an OSSIE YAML file ready to deploy.",
 )
