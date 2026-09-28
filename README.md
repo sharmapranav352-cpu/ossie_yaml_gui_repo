@@ -1,8 +1,9 @@
 # Project Compass: Semantic Model Builder
 
-A Streamlit app by Pranav that builds an OSSIE semantic model YAML
+A Streamlit app by Pranav that builds an Ossie semantic model YAML
 from Snowflake tables, in five steps: connect, choose datasets, define
-relationships, add metrics, and generate the YAML.
+relationships, add metrics, and publish. The step bar at the top of every
+page is the navigation.
 
 ## Run it
 
@@ -21,7 +22,7 @@ streamlit run app.py
 
 ## Saving YAML to GitHub
 
-The Generate YAML page can save the file straight into this repository
+The Publish page can save the file straight into this repository
 (`outputs/`), either as a pull request or as a direct commit.
 
 1. Create a fine-grained GitHub token for this repository only, with

@@ -1,22 +1,21 @@
 import difflib
+import hashlib
 import json
-import re
 
 import streamlit as st
 
+from services import github_service
 from services.builders import (
     build_datasets,
     build_metrics,
     build_relationships,
     validate,
 )
-from services import github_service
 from services.yaml_service import OssieGenerator
 from utils.branding import continue_to, page_header
 from utils.file_manager import (
     EXPECTED_MODEL_NAME,
     FIXED_OUTPUT_FILE,
-    list_yamls,
     read_yaml,
     save_yaml,
 )
@@ -27,40 +26,55 @@ from utils.state import (
     reset_config,
     save_section,
     seed_value,
-    source_file,
 )
 
 init_state()
 
-page_header(
-    "Generate the semantic model",
-    "Name the model, check it, and export the OSSIE YAML. The file is built "
-    "from what you saved on each step."
-)
-
 saved = st.session_state.saved
+gh = github_service.settings()
+filename = FIXED_OUTPUT_FILE or f"{saved['model']['name'] or 'model'}.yaml"
+
+page_header(
+    "Review and publish",
+    f"Check the model, review what changed, and publish {filename}"
+    + (" to GitHub." if gh else "."),
+)
 
 #################################################
 # MODEL DETAILS
 #################################################
 
+if EXPECTED_MODEL_NAME and saved["model"]["name"] != EXPECTED_MODEL_NAME:
+    # The file is deployed under this name, so keep it fixed
+    save_section("model", {**saved["model"], "name": EXPECTED_MODEL_NAME})
+    saved = st.session_state.saved
+
 with st.container(border=True):
 
-    seed_value("gen_model_name", saved["model"]["name"])
+    c1, c2 = st.columns([1, 2.4])
+
+    if EXPECTED_MODEL_NAME:
+        c1.text_input(
+            "Model name", value=EXPECTED_MODEL_NAME, disabled=True,
+            key="gen_model_name_fixed",
+            help=f"Fixed: the file is deployed to Snowflake as the "
+                 f"{EXPECTED_MODEL_NAME} semantic view.",
+        )
+        model_name = EXPECTED_MODEL_NAME
+    else:
+        seed_value("gen_model_name", saved["model"]["name"])
+        model_name = c1.text_input("Model name", key="gen_model_name").strip()
+
     seed_value("gen_model_desc", saved["model"]["description"])
+    model_description = c2.text_input(
+        "Description", key="gen_model_desc",
+        placeholder="What this model is for",
+    ).strip()
 
-    c1, c2 = st.columns([1, 2])
-    model_name = c1.text_input("Model name", key="gen_model_name")
-    model_description = c2.text_input("Description", key="gen_model_desc")
-
-    model_cfg = {
-        **saved["model"],
-        "name": model_name.strip(),
-        "description": model_description.strip(),
-    }
-
+    model_cfg = {**saved["model"], "name": model_name, "description": model_description}
     if model_cfg != saved["model"]:
         save_section("model", model_cfg)
+        saved = st.session_state.saved
 
 #################################################
 # CHECKS
@@ -68,21 +82,12 @@ with st.container(border=True):
 
 errors, warnings = validate(saved)
 
-if EXPECTED_MODEL_NAME and model_cfg["name"] != EXPECTED_MODEL_NAME:
-    errors.append(
-        f"Model name must be {EXPECTED_MODEL_NAME}. This file is deployed to "
-        f"Snowflake as the {EXPECTED_MODEL_NAME} semantic view."
-    )
-
 if errors:
     st.error(
-        "Fix these before generating:\n\n"
-        + "\n".join(f"- {e}" for e in errors)
+        "Fix these before publishing:\n\n" + "\n".join(f"- {e}" for e in errors)
     )
     if not saved["datasets"]["tables"]:
-        continue_to("datasets", "Go to datasets")
-else:
-    st.success("Everything checks out. The model is ready to generate.")
+        continue_to("datasets", "Go to datasets", full_width=False)
 
 if warnings:
     label = "1 suggestion" if len(warnings) == 1 else f"{len(warnings)} suggestions"
@@ -91,266 +96,226 @@ if warnings:
             st.markdown(f"- {w}")
 
 #################################################
-# YAML GENERATION
+# THE YAML, BUILT FROM WHAT IS SAVED
 #################################################
 
-if st.button(
-    "Generate YAML",
-    type="primary",
-    icon=":material/play_arrow:",
-    disabled=bool(errors)
-):
-    st.session_state.generated_yaml = OssieGenerator.generate(
-        model_name=model_cfg["name"],
-        description=model_cfg["description"],
+@st.cache_data(ttl=60, show_spinner=False)
+def _github_version(name, refresh):
+    return github_service.read_file(name)
+
+
+yaml_text = None
+if not errors:
+    yaml_text = OssieGenerator.generate(
+        model_name=saved["model"]["name"],
+        description=saved["model"]["description"],
         datasets=build_datasets(saved["datasets"]),
         relationships=build_relationships(saved["relationships"]),
         metrics=build_metrics(saved["metrics"]),
     )
-    st.session_state.generated_for = model_cfg["name"]
-    st.session_state.pop("gh_result", None)
 
-if "generated_yaml" in st.session_state:
+if yaml_text is not None:
 
-    yaml_text = st.session_state.generated_yaml
-    new_name = re.sub(
-        r"[^A-Za-z0-9_.-]", "_",
-        st.session_state.get("generated_for") or "model"
-    ) + ".yaml"
+    yaml_hash = hashlib.sha1(yaml_text.encode()).hexdigest()
 
-    current_file = source_file()
+    # What we compare against: the file on GitHub, else the local copy
+    baseline, baseline_label, gh_read_error = None, f"outputs/{filename}", None
+    if gh:
+        try:
+            baseline = _github_version(filename, st.session_state.get("gh_refresh", 0))
+            baseline_label = f"{gh['folder']}/{filename} on {gh['branch']}"
+        except Exception as exc:
+            gh_read_error = str(exc)
+    if baseline is None:
+        baseline = read_yaml(filename)
+        baseline_label = f"outputs/{filename}"
 
-    if FIXED_OUTPUT_FILE:
-        # Always save over the one shared file
-        filename = FIXED_OUTPUT_FILE
-        current_file = FIXED_OUTPUT_FILE
-        st.caption(
-            f"Saved as **{FIXED_OUTPUT_FILE}**. The model name above only "
-            "changes the name inside the file."
-        )
+    unchanged = baseline == yaml_text
 
-    # Editing an existing file: update it, or save a copy under a new name
-    elif current_file:
-        mode = st.radio(
-            "Save as",
-            [f"Update {current_file}", "Save as a new file"],
-            horizontal=True,
-            key="gen_save_mode",
-        )
-        if mode == "Save as a new file":
-            filename = st.text_input(
-                "New file name", value=new_name, key="gen_new_filename"
-            ).strip() or new_name
-            filename = re.sub(r"[^A-Za-z0-9_.-]", "_", filename.replace("\\", "/").split("/")[-1])
-            if not filename.endswith((".yaml", ".yml")):
-                filename += ".yaml"
-        else:
-            filename = current_file
-    else:
-        filename = new_name
+    st.write("")
+    left, right = st.columns([1.75, 1], gap="large")
 
-    existing = read_yaml(filename)
+    #################################################
+    # LEFT: CHANGES AND FULL YAML
+    #################################################
 
-    with st.container(border=True):
+    with left:
+        tab_changes, tab_yaml = st.tabs(["Changes", "Full YAML"])
 
-        h1, h2, h3 = st.columns([3, 1, 1], vertical_alignment="center")
-
-        h1.markdown(
-            f"**{filename}**  \n"
-            f"<span style='color:#5A6878;font-size:.875rem'>"
-            f"{len(yaml_text.splitlines())} lines</span>",
-            unsafe_allow_html=True
-        )
-
-        with h2:
-            st.download_button(
-                "Download",
-                data=yaml_text,
-                file_name=filename,
-                mime="text/yaml",
-                icon=":material/download:",
-                type="primary",
-                use_container_width=True
-            )
-
-        with h3:
-            label = (
-                "Update file" if existing is not None and filename == current_file
-                else "Save to outputs"
-            )
-            if st.button(
-                label,
-                icon=":material/save:",
-                use_container_width=True,
-                disabled=existing == yaml_text,
-                help="The file already matches." if existing == yaml_text else None,
-            ):
-                if existing is not None and filename != current_file:
-                    st.warning(
-                        f"outputs/{filename} already exists and was overwritten."
-                    )
-                save_yaml(filename, yaml_text)
-                # From now on, this is the file being edited
-                save_section("model", {**st.session_state.saved["model"],
-                                       "source_file": filename})
-                st.toast(f"Saved outputs/{filename}")
-                existing = yaml_text
-
-        #################################################
-        # SAVE TO GITHUB
-        #################################################
-
-        gh = github_service.settings()
-
-        if gh:
-            modes = {
-                "Open a pull request": "pull_request",
-                f"Commit straight to {gh['branch']}": "direct",
-            }
-            default = 1 if gh["mode"] == "direct" else 0
-
-            g1, g2 = st.columns([1.3, 2], vertical_alignment="bottom")
-            gh_mode = g1.radio(
-                f"Save to GitHub ({gh['repo'].split('/')[-1]})",
-                list(modes),
-                index=default,
-                key="gen_gh_mode",
-                help=(
-                    "A pull request lets you review the change on GitHub "
-                    "before it reaches the repo. Committing straight to the "
-                    "branch saves it immediately."
-                ),
-            )
-            action = "Update"
-            gh_message = g2.text_input(
-                "Commit message",
-                value=f"{action} {gh['folder']}/{filename}",
-                key=f"gen_gh_msg_{filename}",
-            )
-
-            if st.button(
-                "Save to GitHub",
-                icon=":material/cloud_upload:",
-                key="gen_gh_save",
-            ):
-                with st.spinner("Saving to GitHub..."):
-                    try:
-                        # Keep the local copy in step with what goes to GitHub
-                        save_yaml(filename, yaml_text)
-                        save_section("model", {**st.session_state.saved["model"],
-                                               "source_file": filename})
-                        existing = yaml_text
-                        st.session_state.gh_result = github_service.save_file(
-                            filename, yaml_text,
-                            message=gh_message.strip() or None,
-                            mode=modes[gh_mode],
-                        )
-                    except github_service.GitHubError as exc:
-                        st.session_state.gh_result = {"status": "error", "error": str(exc)}
-                    except Exception as exc:
-                        st.session_state.gh_result = {
-                            "status": "error",
-                            "error": f"Couldn't reach GitHub: {exc}",
-                        }
-
-            result = st.session_state.get("gh_result")
-            if result:
-                if result["status"] == "error":
-                    st.error(result["error"])
-                elif result["status"] == "unchanged":
-                    st.info(
-                        f"{result['path']} on GitHub already matches this "
-                        f"YAML. [View it on GitHub]({result['url']})"
-                    )
-                elif result["status"] == "pull_request":
-                    st.success(
-                        f"Pull request opened for {result['path']}. "
-                        f"[Review and merge it on GitHub]({result['url']})"
-                    )
-                else:
-                    st.success(
-                        f"Committed {result['path']} to GitHub. "
-                        f"[View the commit]({result['url']})"
-                    )
-        else:
-            st.caption(
-                "To save straight to GitHub, add a GitHub token to the app's "
-                "secrets (see README)."
-            )
-
-        if existing is not None:
-            if existing == yaml_text:
-                st.caption(f"outputs/{filename} is up to date.")
+        with tab_changes:
+            if baseline is None:
+                st.info(f"{filename} doesn't exist yet. Publishing creates it.")
+            elif unchanged:
+                st.success(f"No changes. {baseline_label} already matches this model.")
             else:
                 diff = "".join(difflib.unified_diff(
-                    existing.splitlines(keepends=True),
+                    baseline.splitlines(keepends=True),
                     yaml_text.splitlines(keepends=True),
-                    fromfile=f"outputs/{filename} (current)",
-                    tofile=f"outputs/{filename} (new)",
+                    fromfile=f"{filename} (current)",
+                    tofile=f"{filename} (new)",
                 ))
                 added = sum(1 for l in diff.splitlines()
                             if l.startswith("+") and not l.startswith("+++"))
                 removed = sum(1 for l in diff.splitlines()
                               if l.startswith("-") and not l.startswith("---"))
-                with st.expander(
-                    f"Changes compared with outputs/{filename}: "
-                    f"{added} line{'' if added == 1 else 's'} added, "
-                    f"{removed} removed",
-                    expanded=bool(current_file and filename == current_file),
-                ):
-                    st.code(diff, language="diff", height=360)
+                st.markdown(
+                    f'<p class="cx-hint">Compared with {baseline_label}: '
+                    f'<b style="color:#217A4F">+{added}</b> '
+                    f'<b style="color:#B42318">-{removed}</b> lines</p>',
+                    unsafe_allow_html=True,
+                )
+                n_lines = len(diff.splitlines())
+                st.code(diff, language="diff", height=440 if n_lines > 20 else None)
+            if gh_read_error:
+                st.caption(f"Couldn't read the file from GitHub, so this compares "
+                           f"with the local copy. {gh_read_error}")
 
-        st.code(yaml_text, language="yaml", height=520)
+        with tab_yaml:
+            st.markdown(
+                f'<p class="cx-hint">{filename}, {len(yaml_text.splitlines())} lines, '
+                f'Ossie {yaml_text.split(chr(10), 1)[0].split(": ", 1)[-1]}</p>',
+                unsafe_allow_html=True,
+            )
+            st.code(yaml_text, language="yaml", height=440)
+
+    #################################################
+    # RIGHT: PUBLISH
+    #################################################
+
+    with right:
+        with st.container(border=True):
+
+            st.markdown('<p class="cx-section">Publish</p>', unsafe_allow_html=True)
+
+            if gh:
+                st.markdown(
+                    f'<p class="cx-hint">Saves <b>{gh["folder"]}/{filename}</b> to '
+                    f'<b>{gh["repo"].split("/")[-1]}</b>.</p>',
+                    unsafe_allow_html=True,
+                )
+
+                modes = {"Pull request": "pull_request", f"Commit to {gh['branch']}": "direct"}
+                default = f"Commit to {gh['branch']}" if gh["mode"] == "direct" else "Pull request"
+                choice = st.segmented_control(
+                    "How to publish", list(modes), default=default,
+                    key="gen_gh_mode", label_visibility="collapsed",
+                ) or default
+                st.caption(
+                    "Opens a pull request for review. The change reaches "
+                    f"{gh['branch']} when you merge it."
+                    if modes[choice] == "pull_request" else
+                    f"Saves straight to {gh['branch']}. The sync to "
+                    "ossie-semantic-contracts starts right away."
+                )
+
+                gh_message = st.text_input(
+                    "Commit message",
+                    value=f"Update {gh['folder']}/{filename}",
+                    key="gen_gh_msg",
+                )
+
+                if st.button(
+                    "Publish to GitHub",
+                    type="primary",
+                    icon=":material/cloud_upload:",
+                    width="stretch",
+                    key="gen_gh_save",
+                    disabled=unchanged,
+                    help="Nothing new to publish." if unchanged else None,
+                ):
+                    with st.spinner("Publishing to GitHub..."):
+                        try:
+                            # Keep the local copy in step with what goes to GitHub
+                            save_yaml(filename, yaml_text)
+                            save_section("model", {**st.session_state.saved["model"],
+                                                   "source_file": filename})
+                            result = github_service.save_file(
+                                filename, yaml_text,
+                                message=gh_message.strip() or None,
+                                mode=modes[choice],
+                            )
+                        except github_service.GitHubError as exc:
+                            result = {"status": "error", "error": str(exc)}
+                        except Exception as exc:
+                            result = {"status": "error", "error": f"Couldn't reach GitHub: {exc}"}
+                    result["for"] = yaml_hash
+                    st.session_state.gh_result = result
+                    if result["status"] != "error":
+                        # Forget the stored copy of the GitHub file, for every session
+                        _github_version.clear()
+                        st.session_state.gh_refresh = st.session_state.get("gh_refresh", 0) + 1
+                    st.rerun()
+
+                result = st.session_state.get("gh_result")
+                if result and result.get("for") == yaml_hash:
+                    if result["status"] == "error":
+                        st.error(result["error"])
+                    elif result["status"] == "pull_request":
+                        st.success(f"Pull request opened. [Review and merge it]({result['url']})")
+                    elif result["status"] == "committed":
+                        st.success(f"Published to {gh['branch']}. [View the commit]({result['url']})")
+                    else:
+                        st.info(f"GitHub already has this version. [View it]({result['url']})")
+
+            else:
+                st.markdown(
+                    '<p class="cx-hint">Publishing to GitHub isn\'t set up. Add a '
+                    '[github] section to the app\'s secrets (see README).</p>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    "Save to outputs", type="primary", icon=":material/save:",
+                    width="stretch", disabled=unchanged, key="gen_local_save",
+                ):
+                    save_yaml(filename, yaml_text)
+                    save_section("model", {**st.session_state.saved["model"],
+                                           "source_file": filename})
+                    st.toast(f"Saved outputs/{filename}")
+                    st.rerun()
+
+            st.download_button(
+                "Download YAML",
+                data=yaml_text,
+                file_name=filename,
+                mime="text/yaml",
+                icon=":material/download:",
+                width="stretch",
+            )
 
 #################################################
-# PROJECT FILES
+# ADVANCED
 #################################################
 
 st.write("")
 
-with st.expander("Project settings and saved files"):
+with st.expander("Advanced: export, load or reset the configuration"):
 
-    st.markdown("**Saved YAML files**")
-    files = list_yamls()
-    if files:
-        for file in files:
-            st.markdown(f"- `outputs/{file.name}`")
-    else:
-        st.caption("No YAML files saved yet.")
-
-    st.divider()
-
-    st.markdown("**Configuration**")
     st.caption(
-        "Your saved steps are stored in saved_config/model_config.json and "
-        "reload automatically. Export them to share a model or reuse it later."
+        "Your saved steps reload automatically. Export them to share a model "
+        "or reuse it later."
     )
 
-    st.download_button(
-        "Export configuration",
-        data=config_json(),
-        file_name=f"{model_cfg['name'] or 'model'}_config.json",
-        mime="application/json",
-        icon=":material/upload_file:"
-    )
+    a1, a2 = st.columns(2, gap="large")
 
-    uploaded = st.file_uploader("Load a configuration file", type=["json"])
+    with a1:
+        st.download_button(
+            "Export configuration",
+            data=config_json(),
+            file_name=f"{saved['model']['name'] or 'model'}_config.json",
+            mime="application/json",
+            icon=":material/file_download:",
+        )
+        uploaded = st.file_uploader("Load a configuration file", type=["json"])
+        if uploaded is not None and st.button("Load configuration"):
+            try:
+                replace_config(json.loads(uploaded.getvalue().decode("utf-8")))
+                st.rerun()
+            except ValueError as exc:
+                st.error(f"That file isn't a valid configuration: {exc}")
 
-    if uploaded is not None and st.button("Load configuration"):
-        try:
-            replace_config(json.loads(uploaded.getvalue().decode("utf-8")))
-            st.session_state.pop("generated_yaml", None)
+    with a2:
+        st.markdown("**Start over**")
+        confirm = st.checkbox("Clear all saved datasets, relationships and metrics")
+        if st.button("Clear everything", disabled=not confirm):
+            reset_config()
             st.rerun()
-        except ValueError as exc:
-            st.error(f"That file isn't a valid configuration: {exc}")
-
-    st.divider()
-
-    st.markdown("**Start over**")
-    confirm = st.checkbox(
-        "Clear all saved datasets, relationships and metrics"
-    )
-    if st.button("Clear everything", disabled=not confirm):
-        reset_config()
-        st.session_state.pop("generated_yaml", None)
-        st.rerun()

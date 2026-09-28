@@ -5,7 +5,7 @@ PAGES = [
     {"key": "datasets",      "path": "pages/1_Datasets.py",      "title": "Datasets",      "icon": ":material/table:"},
     {"key": "relationships", "path": "pages/2_Relationships.py", "title": "Relationships", "icon": ":material/hub:"},
     {"key": "metrics",       "path": "pages/3_Metrics.py",       "title": "Metrics",       "icon": ":material/functions:"},
-    {"key": "generate",      "path": "pages/4_Generate_YAML.py", "title": "Generate YAML", "icon": ":material/description:"},
+    {"key": "publish",       "path": "pages/4_Generate_YAML.py", "title": "Publish",       "icon": ":material/publish:"},
 ]
 
 BY_KEY = {p["key"]: p for p in PAGES}
