@@ -39,3 +39,24 @@ The Generate YAML page can save the file straight into this repository
    ```
 
 Never commit the token to the repository.
+
+## Ossie format and syncing to ossie-semantic-contracts
+
+The app writes standard Apache Ossie YAML, version `0.2.0.dev0`, with the
+model at the top level (no `semantic_model:` wrapper). The file is always
+`outputs/SIT_YAML_GUI.yaml` and the model is always named `SIT_TEST1`.
+
+When `outputs/SIT_YAML_GUI.yaml` changes on `main`, the
+*Sync to ossie-semantic-contracts* workflow checks it, runs it through that
+repo's Snowflake converter, and copies it to
+`project-compass-SIT/ossie-semantic-contracts` as
+`ossie_yaml/SIT_TEST1_0.2.0.dev0_ossie.yaml`. By default it opens a pull
+request there, because merging it deploys the semantic view to Snowflake.
+
+Setup, in this repo's Settings > Secrets and variables > Actions:
+
+- Secret `CONTRACTS_REPO_TOKEN`: fine-grained token for
+  `project-compass-SIT/ossie-semantic-contracts` with Contents and
+  Pull requests set to Read and write.
+- Optional variable `CONTRACTS_SYNC_MODE`: `pull_request` (default) or
+  `direct` to commit straight to that repo's `main`.

@@ -13,7 +13,13 @@ from services.builders import (
 from services import github_service
 from services.yaml_service import OssieGenerator
 from utils.branding import continue_to, page_header
-from utils.file_manager import FIXED_OUTPUT_FILE, list_yamls, read_yaml, save_yaml
+from utils.file_manager import (
+    EXPECTED_MODEL_NAME,
+    FIXED_OUTPUT_FILE,
+    list_yamls,
+    read_yaml,
+    save_yaml,
+)
 from utils.state import (
     config_json,
     init_state,
@@ -61,6 +67,12 @@ with st.container(border=True):
 #################################################
 
 errors, warnings = validate(saved)
+
+if EXPECTED_MODEL_NAME and model_cfg["name"] != EXPECTED_MODEL_NAME:
+    errors.append(
+        f"Model name must be {EXPECTED_MODEL_NAME}. This file is deployed to "
+        f"Snowflake as the {EXPECTED_MODEL_NAME} semantic view."
+    )
 
 if errors:
     st.error(

@@ -53,16 +53,28 @@ def parse_ossie_yaml(text):
     except yaml.YAMLError as exc:
         raise OssieImportError(f"This isn't valid YAML: {exc}") from exc
 
-    if not isinstance(doc, dict) or not doc.get("semantic_model"):
-        raise OssieImportError(
-            "This doesn't look like an OSSIE file: no semantic_model section."
-        )
-
-    models = doc["semantic_model"]
-    if isinstance(models, dict):
-        models = [models]
+    if not isinstance(doc, dict):
+        raise OssieImportError("This doesn't look like an OSSIE file.")
 
     notes = []
+
+    if doc.get("semantic_model"):
+        # Older layout: models wrapped in a semantic_model list
+        models = doc["semantic_model"]
+        if isinstance(models, dict):
+            models = [models]
+        notes.append(
+            "This file uses the older semantic_model layout. It will be saved "
+            "in the standard Ossie layout (model properties at the top level)."
+        )
+    elif doc.get("datasets") is not None or doc.get("name"):
+        # Standard Ossie layout: model properties at the document root
+        models = [{k: v for k, v in doc.items() if k != "version"}]
+    else:
+        raise OssieImportError(
+            "This doesn't look like an OSSIE file: no name or datasets found."
+        )
+
     if len(models) > 1:
         notes.append(
             f"The file has {len(models)} semantic models. Only the first, "
@@ -88,7 +100,7 @@ def parse_ossie_yaml(text):
 
         _extra_keys(ds, KNOWN_DATASET_KEYS, f"Dataset {name}", notes)
 
-        columns, time_columns = [], []
+        columns, time_columns, fact_columns = [], [], []
         for field in ds.get("fields") or []:
             fname = field.get("name")
             expr = _snowflake_expression(field.get("expression"))
@@ -101,7 +113,9 @@ def parse_ossie_yaml(text):
             _extra_keys(field, KNOWN_FIELD_KEYS, f"Field {name}.{fname}", notes)
 
             columns.append(fname)
-            if (field.get("dimension") or {}).get("is_time"):
+            if "dimension" not in field:
+                fact_columns.append(fname)
+            elif (field.get("dimension") or {}).get("is_time"):
                 time_columns.append(fname)
 
         pk = ds.get("primary_key") or []
@@ -114,7 +128,7 @@ def parse_ossie_yaml(text):
             "selected_columns": columns,
             "primary_keys": [c for c in pk if c in columns],
             "time_columns": time_columns,
-            "column_types": {},
+            "fact_columns": fact_columns,
         })
 
     database, schema = (scopes[0] if scopes else (None, None))
@@ -150,6 +164,7 @@ def parse_ossie_yaml(text):
         })
 
     # ---- metrics -----------------------------------------------------------
+    known_columns = {t["name"]: set(t["selected_columns"]) for t in tables}
     metrics = []
     for m in model.get("metrics") or []:
         _extra_keys(m, KNOWN_METRIC_KEYS, f"Metric {m.get('name')}", notes)
@@ -165,7 +180,8 @@ def parse_ossie_yaml(text):
             "expression": expr,
         }
 
-        if match:
+        if match and match.group(3) in known_columns and \
+                match.group(4) in known_columns[match.group(3)]:
             func, distinct, table, column = match.groups()
             func = func.upper()
             metric.update({
