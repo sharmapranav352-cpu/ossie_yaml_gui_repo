@@ -90,7 +90,9 @@ def _css():
   display: none !important;
 }}
 .block-container {{
-  max-width: 1120px;
+  max-width: 100%;
+  padding-left: 3rem;
+  padding-right: 3rem;
   padding-top: 3.25rem;
   padding-bottom: 6rem;
 }}
@@ -226,7 +228,7 @@ h2, h3 {{ letter-spacing: -0.005em; }}
 /* ---------- Snap Analytics mark, bottom-right corner ---------- */
 .cx-corner {{
   position: fixed; z-index: 999990; pointer-events: none;
-  right: 1.25rem; bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  left: 1.25rem; bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   display: flex; align-items: center;
   padding: .3rem .5rem; border-radius: .375rem;
   background: rgba(255, 255, 255, .94);
