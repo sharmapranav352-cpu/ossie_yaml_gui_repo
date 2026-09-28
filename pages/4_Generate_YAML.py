@@ -13,7 +13,7 @@ from services.builders import (
 from services import github_service
 from services.yaml_service import OssieGenerator
 from utils.branding import continue_to, page_header
-from utils.file_manager import list_yamls, read_yaml, save_yaml
+from utils.file_manager import FIXED_OUTPUT_FILE, list_yamls, read_yaml, save_yaml
 from utils.state import (
     config_json,
     init_state,
@@ -108,8 +108,17 @@ if "generated_yaml" in st.session_state:
 
     current_file = source_file()
 
+    if FIXED_OUTPUT_FILE:
+        # Always save over the one shared file
+        filename = FIXED_OUTPUT_FILE
+        current_file = FIXED_OUTPUT_FILE
+        st.caption(
+            f"Saved as **{FIXED_OUTPUT_FILE}**. The model name above only "
+            "changes the name inside the file."
+        )
+
     # Editing an existing file: update it, or save a copy under a new name
-    if current_file:
+    elif current_file:
         mode = st.radio(
             "Save as",
             [f"Update {current_file}", "Save as a new file"],
@@ -200,7 +209,7 @@ if "generated_yaml" in st.session_state:
                     "branch saves it immediately."
                 ),
             )
-            action = "Update" if filename == current_file else "Add"
+            action = "Update"
             gh_message = g2.text_input(
                 "Commit message",
                 value=f"{action} {gh['folder']}/{filename}",

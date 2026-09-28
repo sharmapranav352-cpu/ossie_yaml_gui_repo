@@ -1,5 +1,9 @@
 from pathlib import Path
 
+# Every generated model is saved under this one name, locally and on GitHub.
+# Set to None to name files after the model instead.
+FIXED_OUTPUT_FILE = "SIT_YAML_GUI.yaml"
+
 OUTPUT_DIR = Path(
     "outputs"
 )

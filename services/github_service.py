@@ -168,6 +168,11 @@ def save_file(filename, text, message=None, mode=None):
     repo_url = f"https://github.com/{cfg['repo']}"
 
     current, sha = _get_file(cfg, path, cfg["branch"])
+    if current is None:
+        raise GitHubError(
+            f"{path} doesn't exist on the {cfg['branch']} branch. This app only "
+            "updates existing files, so nothing was saved."
+        )
     if current == text:
         return {
             "status": "unchanged",
@@ -175,7 +180,7 @@ def save_file(filename, text, message=None, mode=None):
             "path": path,
         }
 
-    action = "Update" if current is not None else "Add"
+    action = "Update"
     message = message or f"{action} {path} from Semantic Model Builder"
 
     if mode == "direct":
