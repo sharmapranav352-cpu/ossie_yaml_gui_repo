@@ -190,6 +190,39 @@ h2, h3 {{ letter-spacing: -0.005em; }}
 .cx-conn dt {{ font-size: .8125rem; color: var(--cx-muted); margin: 0; }}
 .cx-conn dd {{ margin: .125rem 0 0; font-weight: 500; color: var(--cx-ink); overflow-wrap: anywhere; }}
 
+/* ---------- Sync tracker ---------- */
+.cx-track {{ list-style: none; margin: .25rem 0 0; padding: 0; }}
+.cx-track li {{
+  position: relative; display: flex; gap: .875rem; padding: 0 0 1.125rem;
+}}
+.cx-track li:not(:last-child)::before {{
+  content: ""; position: absolute; left: .6875rem; top: 1.625rem; bottom: .125rem;
+  width: 2px; background: var(--cx-line);
+}}
+.cx-track li.is-done:not(:last-child)::before {{ background: var(--cx-done); }}
+.cx-ti {{
+  flex: none; width: 1.375rem; height: 1.375rem; margin-top: .0625rem;
+  border-radius: 50%; border: 2px solid var(--cx-line); background: #fff;
+  display: grid; place-items: center; font-size: .75rem; font-weight: 700;
+  color: #fff; box-sizing: border-box;
+}}
+.cx-track li.is-done .cx-ti {{ background: var(--cx-done); border-color: var(--cx-done); }}
+.cx-track li.is-done .cx-ti::after {{ content: "✓"; }}
+.cx-track li.is-error .cx-ti {{ background: #B42318; border-color: #B42318; }}
+.cx-track li.is-error .cx-ti::after {{ content: "✕"; }}
+.cx-track li.is-waiting .cx-ti {{ border-color: var(--cx-warn); }}
+.cx-track li.is-waiting .cx-ti::after {{ content: ""; width: .375rem; height: .375rem; border-radius: 50%; background: var(--cx-warn); }}
+.cx-track li.is-active .cx-ti {{
+  border-color: var(--cx-line); border-top-color: var(--cx-primary);
+  animation: cx-spin .9s linear infinite;
+}}
+@keyframes cx-spin {{ to {{ transform: rotate(360deg); }} }}
+.cx-track .cx-tt {{ font-weight: 600; color: var(--cx-ink); font-size: .9375rem; line-height: 1.5rem; }}
+.cx-track li.is-pending .cx-tt {{ color: var(--cx-muted); }}
+.cx-track .cx-td {{ font-size: .875rem; color: var(--cx-muted); line-height: 1.45; }}
+.cx-track .cx-td a {{ color: var(--cx-primary); font-weight: 500; white-space: nowrap; }}
+.cx-track li.is-error .cx-td {{ color: #B42318; }}
+
 /* ---------- Snap Analytics mark, bottom-right corner ---------- */
 .cx-corner {{
   position: fixed; z-index: 999990; pointer-events: none;

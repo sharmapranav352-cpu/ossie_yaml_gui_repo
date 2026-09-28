@@ -1,6 +1,7 @@
 import streamlit as st
 
 from services.builders import METRIC_TYPES
+from services.ossie_import import _AGG
 from utils.branding import continue_to, page_header
 from utils.state import (
     add_row,
@@ -35,6 +36,40 @@ columns_by_table = {
 }
 
 ids, seeds = row_ids("met_", saved_metrics)
+
+
+def _match(options, value):
+    """The option equal to value, ignoring upper/lower case; None if there isn't one."""
+    if value in options:
+        return value
+    lowered = {o.lower(): o for o in options}
+    return lowered.get((value or "").lower())
+
+
+def seed_source(rid, prev):
+    """
+    Pick the dataset and column for a SUM/AVG/... metric without guessing.
+    Uses the saved values, or the table.column inside the metric's current
+    expression (e.g. SUM(orders.o_totalprice) -> ORDERS / O_TOTALPRICE).
+    Anything that doesn't match stays empty for the user to choose.
+    """
+    t_key, c_key = f"met_{rid}_table", f"met_{rid}_col"
+
+    if t_key not in st.session_state:
+        table, column = prev.get("table"), prev.get("column")
+        expr = st.session_state.get(f"met_{rid}_custom") or prev.get("expression") or ""
+        found = _AGG.match(expr)
+        if found and not table:
+            table, column = found.group(3), found.group(4)
+        st.session_state[t_key] = _match(tables, table)
+        st.session_state[c_key] = column   # checked against the table's columns below
+    elif st.session_state[t_key] not in tables:
+        st.session_state[t_key] = None
+
+    cols = columns_by_table.get(st.session_state[t_key], [])
+    st.session_state[c_key] = _match(cols, st.session_state.get(c_key))
+    return cols
+
 
 metrics = []
 
@@ -89,22 +124,23 @@ with st.container(border=True):
             )
         else:
             src = row[2].columns(2)
-            seed_choice(f"met_{rid}_table", tables, prev.get("table"))
+            cols = seed_source(rid, prev)
             table = src[0].selectbox(
                 "Dataset", tables, key=f"met_{rid}_table",
-                label_visibility="collapsed",
+                label_visibility="collapsed", placeholder="Choose dataset",
             )
-
             cols = columns_by_table.get(table, [])
-            seed_choice(f"met_{rid}_col", cols, prev.get("column"))
             column = src[1].selectbox(
                 "Column", cols, key=f"met_{rid}_col",
-                label_visibility="collapsed",
-                help=f"Calculates {metric_type}({table}.<column>)",
+                label_visibility="collapsed", placeholder="Choose column",
+                help=f"Calculates {metric_type}({table or 'dataset'}.<column>)",
             )
 
             metric["table"] = table
             metric["column"] = column
+            # Remember the custom expression in case this goes back to CUSTOM
+            # (it is only written to the YAML for CUSTOM metrics)
+            metric["expression"] = prev.get("expression", "")
 
         seed_value(f"met_{rid}_desc", prev.get("description", ""))
         metric["description"] = row[3].text_input(

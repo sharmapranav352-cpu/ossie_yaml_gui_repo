@@ -1,10 +1,13 @@
 import difflib
 import hashlib
+import html
 import json
+import time
+from datetime import datetime
 
 import streamlit as st
 
-from services import github_service
+from services import github_service, sync_status
 from services.builders import (
     build_datasets,
     build_metrics,
@@ -102,6 +105,85 @@ if warnings:
 @st.cache_data(ttl=60, show_spinner=False)
 def _github_version(name, refresh):
     return github_service.read_file(name)
+
+
+SYNC_TIMEOUT = 15 * 60   # stop checking automatically after 15 minutes
+SYNC_EVERY = 5           # seconds between checks while in progress
+
+OVERALL = {
+    "done": ("success", "Both repositories are in sync."),
+    "active": ("info", "Syncing. This updates by itself every few seconds."),
+    "waiting": ("warning", "Waiting for a pull request to be merged. This updates by itself."),
+    "error": ("error", "The sync stopped. See the step marked in red."),
+    "idle": ("info", "This version isn't published yet."),
+}
+
+
+def render_sync_status(gh, yaml_text, yaml_hash):
+    """Where this YAML is: ossie_yaml_gui_repo, the sync workflow, ossie-semantic-contracts."""
+    track = st.session_state.get("sync_track")
+    if track and track.get("for") != yaml_hash:
+        track = None   # the model changed since that publish
+
+    st.write("")
+    with st.container(border=True):
+        h1, h2 = st.columns([4, 1], vertical_alignment="center")
+        h1.markdown(
+            '<p class="cx-section">Sync status</p>'
+            f'<p class="cx-hint" style="margin:0">{html.escape(gh["repo"].split("/")[-1])} '
+            f'to {html.escape(gh["contracts_repo"].split("/")[-1])}</p>',
+            unsafe_allow_html=True,
+        )
+        if h2.button("Check now", icon=":material/refresh:", key="sync_check",
+                     width="stretch"):
+            st.session_state.sync_polling = True
+            st.session_state.sync_started = time.time()
+            st.session_state.sync_checked = True
+
+        if not (track or st.session_state.get("sync_checked")):
+            st.markdown(
+                '<p class="cx-hint">Publish to follow the file through both '
+                'repositories, or select Check now to see where the current '
+                'version is.</p>',
+                unsafe_allow_html=True,
+            )
+            return
+
+        polling = st.session_state.get("sync_polling", False)
+
+        @st.fragment(run_every=SYNC_EVERY if polling else None)
+        def _tracker():
+            try:
+                stages, overall = sync_status.check(gh, yaml_text, track)
+            except Exception as exc:
+                st.error(f"Couldn't check the sync: {exc}")
+                return
+
+            items = []
+            for i, s in enumerate(stages, start=1):
+                link = (f' <a href="{html.escape(s["url"])}" target="_blank">Open</a>'
+                        if s.get("url") else "")
+                items.append(
+                    f'<li class="is-{s["state"]}"><span class="cx-ti"></span><div>'
+                    f'<div class="cx-tt">{html.escape(s["label"])}</div>'
+                    f'<div class="cx-td">{html.escape(s["detail"] or "Not started yet.")}{link}</div>'
+                    f'</div></li>'
+                )
+            st.markdown('<ol class="cx-track">' + "".join(items) + "</ol>",
+                        unsafe_allow_html=True)
+
+            kind, text = OVERALL[overall]
+            getattr(st, kind)(text)
+            st.caption(f"Last checked {datetime.now().strftime('%H:%M:%S')}")
+
+            # Stop checking once finished, failed, or after the time limit
+            still = overall in ("active", "waiting")
+            timed_out = time.time() - st.session_state.get("sync_started", 0) > SYNC_TIMEOUT
+            if st.session_state.get("sync_polling") and (not still or timed_out):
+                st.session_state.sync_polling = False
+                st.rerun()
+
+        _tracker()
 
 
 yaml_text = None
@@ -244,6 +326,10 @@ if yaml_text is not None:
                         # Forget the stored copy of the GitHub file, for every session
                         _github_version.clear()
                         st.session_state.gh_refresh = st.session_state.get("gh_refresh", 0) + 1
+                        # Follow this publish through both repos
+                        st.session_state.sync_track = {**result, "for": yaml_hash}
+                        st.session_state.sync_polling = True
+                        st.session_state.sync_started = time.time()
                     st.rerun()
 
                 result = st.session_state.get("gh_result")
@@ -281,6 +367,13 @@ if yaml_text is not None:
                 icon=":material/download:",
                 width="stretch",
             )
+
+    #################################################
+    # SYNC STATUS
+    #################################################
+
+    if gh:
+        render_sync_status(gh, yaml_text, yaml_hash)
 
 #################################################
 # ADVANCED

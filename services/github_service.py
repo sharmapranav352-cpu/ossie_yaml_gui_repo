@@ -49,6 +49,16 @@ def settings():
         "branch": cfg.get("branch", "main"),
         "folder": cfg.get("folder", "outputs").strip("/"),
         "mode": cfg.get("mode", "pull_request"),
+        # Where the sync workflow copies the file (read only, for the tracker)
+        "contracts_repo": cfg.get(
+            "contracts_repo", "project-compass-SIT/ossie-semantic-contracts"
+        ).strip().strip("/"),
+        "contracts_file": cfg.get(
+            "contracts_file", "ossie_yaml/SIT_TEST1_0.2.0.dev0_ossie.yaml"
+        ),
+        "contracts_branch": cfg.get("contracts_branch", "main"),
+        "contracts_token": cfg.get("contracts_token") or None,
+        "sync_workflow": cfg.get("sync_workflow", "sync-to-contracts.yml"),
     }
 
 
@@ -189,6 +199,7 @@ def save_file(filename, text, message=None, mode=None):
             "status": "committed",
             "url": result["commit"]["html_url"],
             "path": path,
+            "sha": result["commit"].get("sha"),
         }
 
     # Pull request: one new branch per save
@@ -206,4 +217,9 @@ def save_file(filename, text, message=None, mode=None):
             "Review the changes under **Files changed**, then merge."
         ),
     )
-    return {"status": "pull_request", "url": pr["html_url"], "path": path}
+    return {
+        "status": "pull_request",
+        "url": pr["html_url"],
+        "path": path,
+        "pr_number": pr.get("number"),
+    }
