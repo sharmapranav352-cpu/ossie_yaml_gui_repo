@@ -4,6 +4,11 @@ from pathlib import Path
 # Set to None to name files after the model instead.
 FIXED_OUTPUT_FILE = "SIT_YAML_GUI.yaml"
 
+# The model name the file must carry. SIT_YAML_GUI.yaml is synced to
+# ossie-semantic-contracts, which deploys it as this semantic view.
+# Set to None to allow any name.
+EXPECTED_MODEL_NAME = "SIT_TEST1"
+
 OUTPUT_DIR = Path(
     "outputs"
 )

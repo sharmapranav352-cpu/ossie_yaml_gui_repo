@@ -205,13 +205,31 @@ for table in selected_tables:
             help="Date and timestamp columns are selected for you."
         )
 
+        fact_options = [c for c in selected_columns if c not in time_columns]
+        seed_multi(
+            f"{key}.facts",
+            fact_options,
+            prev.get("fact_columns", []) if prev else []
+        )
+
+        fact_columns = st.multiselect(
+            "Facts (measures)",
+            fact_options,
+            key=f"{key}.facts",
+            help=(
+                "Numeric values you add up or average, such as prices and "
+                "quantities. Every other column is treated as a dimension "
+                "you group or filter by."
+            )
+        )
+
     table_cfgs.append({
         "name": table,
         "source": f"{database}.{schema}.{table}",
         "selected_columns": selected_columns,
         "primary_keys": primary_keys,
         "time_columns": time_columns,
-        "column_types": {c: types.get(c) for c in selected_columns},
+        "fact_columns": fact_columns,
     })
 
 ##################################################

@@ -1,0 +1,106 @@
+name: Sync to ossie-semantic-contracts
+
+# When outputs/SIT_YAML_GUI.yaml changes on main, copy it to
+# project-compass-SIT/ossie-semantic-contracts as
+# ossie_yaml/SIT_TEST1_0.2.0.dev0_ossie.yaml.
+#
+# In that repo, a change to that file on main converts it and DEPLOYS the
+# semantic view to Snowflake, so by default this opens a pull request there.
+# Set the repository variable CONTRACTS_SYNC_MODE to "direct" to commit
+# straight to its main branch instead.
+#
+# Needs the secret CONTRACTS_REPO_TOKEN: a fine-grained token for
+# project-compass-SIT/ossie-semantic-contracts with Contents and
+# Pull requests set to Read and write.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "outputs/SIT_YAML_GUI.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contracts-sync
+  cancel-in-progress: false
+
+env:
+  SOURCE_FILE: outputs/SIT_YAML_GUI.yaml
+  TARGET_REPO: project-compass-SIT/ossie-semantic-contracts
+  TARGET_FILE: ossie_yaml/SIT_TEST1_0.2.0.dev0_ossie.yaml
+  EXPECTED_NAME: ${{ vars.CONTRACTS_MODEL_NAME || 'SIT_TEST1' }}
+  SYNC_MODE: ${{ vars.CONTRACTS_SYNC_MODE || 'pull_request' }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out this repo
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Check out ossie-semantic-contracts
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TARGET_REPO }}
+          token: ${{ secrets.CONTRACTS_REPO_TOKEN }}
+          path: contracts
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Check the file
+        run: python source/scripts/check_contract_yaml.py "source/$SOURCE_FILE" "$EXPECTED_NAME"
+
+      - name: Check it converts with the contracts repo's own converter
+        run: python contracts/scripts/snowflake/converter.py -i "source/$SOURCE_FILE" -o /tmp/snowflake_check.yaml
+
+      - name: Copy the file
+        id: copy
+        run: |
+          cp "source/$SOURCE_FILE" "contracts/$TARGET_FILE"
+          cd contracts
+          if git diff --quiet -- "$TARGET_FILE"; then
+            echo "The contracts repo already has this version. Nothing to do."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git diff --stat -- "$TARGET_FILE"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open a pull request in ossie-semantic-contracts
+        if: steps.copy.outputs.changed == 'true' && env.SYNC_MODE != 'direct'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          path: contracts
+          token: ${{ secrets.CONTRACTS_REPO_TOKEN }}
+          base: main
+          branch: sync/sit-yaml-gui
+          add-paths: ${{ env.TARGET_FILE }}
+          commit-message: "Update SIT_TEST1 Ossie YAML from ossie_yaml_gui_repo"
+          title: "Update SIT_TEST1 Ossie YAML from the Semantic Model Builder"
+          body: |
+            Synced from `${{ github.repository }}` (`${{ env.SOURCE_FILE }}`, commit ${{ github.sha }}).
+
+            **Merging this deploys the SIT_TEST1 semantic view to Snowflake** through the
+            *Convert and Deploy Snowflake Semantic View YAML* workflow.
+            Review the changes under **Files changed** first.
+          delete-branch: true
+
+      - name: Commit straight to main in ossie-semantic-contracts
+        if: steps.copy.outputs.changed == 'true' && env.SYNC_MODE == 'direct'
+        working-directory: contracts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$TARGET_FILE"
+          git commit -m "Update SIT_TEST1 Ossie YAML from ossie_yaml_gui_repo@${GITHUB_SHA::7}"
+          git push origin HEAD:main

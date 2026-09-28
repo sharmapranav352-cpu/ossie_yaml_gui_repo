@@ -54,25 +54,30 @@ def build_datasets(cfg):
         fields = []
 
         for col in table["selected_columns"]:
-            fields.append({
+            field = {
                 "name": col,
                 "expression": _snowflake_expr(col),
-                "custom_extensions": copy.deepcopy(PUBLIC_ACCESS),
-                "dimension": (
-                    {"is_time": True}
-                    if col in table["time_columns"]
-                    else {}
-                ),
-            })
+            }
 
+            # Ossie: a field with no dimension block is a fact (measure)
+            if col in table["time_columns"]:
+                field["dimension"] = {"is_time": True}
+            elif col not in table.get("fact_columns", []):
+                field["dimension"] = {}
+
+            field["custom_extensions"] = copy.deepcopy(PUBLIC_ACCESS)
+            fields.append(field)
+
+        # Key order follows the Ossie contracts repo: name, source, primary_key, fields
         dataset = {
             "name": table["name"],
             "source": table["source"],
-            "fields": fields,
         }
 
         if table["primary_keys"]:
             dataset["primary_key"] = list(table["primary_keys"])
+
+        dataset["fields"] = fields
 
         datasets.append(dataset)
 
