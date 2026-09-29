@@ -185,15 +185,6 @@ relationships:
     to_columns:
       - C_CUSTKEY
 metrics:
-  - name: AVERAGE_PRICE_PER_UNIT
-    expression:
-      dialects:
-        - dialect: SNOWFLAKE
-          expression: TOTAL_PRICE / TOTAL_QUANTITY
-    description: The TOTAL_PRICE metric divided by TOTAL_QUANTITY.
-    custom_extensions:
-      - vendor_name: SNOWFLAKE
-        data: "{\"access_modifier\":\"public_access\"}"
   - name: TOTAL_PRICE
     expression:
       dialects:
@@ -218,6 +209,15 @@ metrics:
         - dialect: SNOWFLAKE
           expression: AVG(lineitem.l_quantity)
     description: The sum of the l_quantity field in the LINEITEM table.
+    custom_extensions:
+      - vendor_name: SNOWFLAKE
+        data: "{\"access_modifier\":\"public_access\"}"
+  - name: AVG_PRICE
+    expression:
+      dialects:
+        - dialect: SNOWFLAKE
+          expression: AVG(orders.o_totalprice)
+    description: The average of o_totalprice field from the ORDERS table.
     custom_extensions:
       - vendor_name: SNOWFLAKE
         data: "{\"access_modifier\":\"public_access\"}"
