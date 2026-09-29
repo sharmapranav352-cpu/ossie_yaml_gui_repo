@@ -70,9 +70,9 @@ def check(cfg, yaml_text, publish):
     publish = publish or {}
 
     stages = [
-        {"key": "source", "label": f"Saved in {src_name}", "state": "pending", "detail": "", "url": None},
+        {"key": "source", "label": "Saved in GUI", "state": "pending", "detail": "", "url": None},
         {"key": "sync", "label": "Sync workflow", "state": "pending", "detail": "", "url": None},
-        {"key": "target", "label": f"Updated in {tgt_name}", "state": "pending", "detail": "", "url": None},
+        {"key": "target", "label": "Updated in Snowflake's Semantic Layer", "state": "pending", "detail": "", "url": None},
     ]
     s_src, s_sync, s_tgt = stages
 
