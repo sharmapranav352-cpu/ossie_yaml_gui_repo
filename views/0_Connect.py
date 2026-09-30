@@ -4,7 +4,7 @@ import streamlit as st
 
 from services.ossie_import import OssieImportError, parse_ossie_yaml
 from services.snowflake_service import SnowflakeService
-from utils.branding import continue_to, page_header
+from utils.branding import continue_to, page_header, section_heading
 from utils.file_manager import list_yamls, read_yaml
 from utils.state import init_state, open_config, reset_config, source_file
 
@@ -146,6 +146,12 @@ conn = st.session_state.get("connection_info")
 
 with left:
 
+    section_heading(
+        "Create a New Semantic Model",
+        "Connect to Snowflake, then choose the tables, joins and metrics to "
+        "build a semantic model from scratch.",
+    )
+
     ##################################################
     # CONNECTED
     ##################################################
@@ -264,6 +270,11 @@ with left:
                         st.rerun()
 
 with right:
+    section_heading(
+        "Update Existing Semantic Model",
+        "Open the published model, change it on the next steps, and publish "
+        "the update to Snowflake's Semantic Layer.",
+    )
     model_card()
     if not st.session_state.snowflake and st.session_state.saved["datasets"]["tables"]:
         st.caption(

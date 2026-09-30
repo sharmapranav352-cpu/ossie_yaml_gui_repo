@@ -176,6 +176,15 @@ h2, h3 {{ letter-spacing: -0.005em; }}
   font-size: .875rem; line-height: 1.5; color: var(--cx-muted); margin: 0 0 .75rem;
 }}
 
+/* ---------- Section headings (Connect page) ---------- */
+.cx-group {{ min-height: 4.75rem; margin-bottom: .75rem; }}
+.cx-group h3 {{
+  margin: 0 0 .25rem; padding: 0; font-size: 1.25rem; font-weight: 600;
+  color: var(--cx-ink); letter-spacing: -0.01em;
+}}
+.cx-group p {{ margin: 0; font-size: .9375rem; line-height: 1.5; color: var(--cx-muted); }}
+@media (max-width: 760px) {{ .cx-group {{ min-height: 0; }} }}
+
 /* ---------- Bottom action bar ---------- */
 .st-key-cx-actions {{
   margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--cx-line);
@@ -301,6 +310,15 @@ def brand_block(show_logo=False):
         f'<span class="cx-product">{html.escape(PRODUCT)}</span></div>'
         f'<div class="cx-pills">{conn_pill}{file_pill}</div>'
         f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def section_heading(title, description):
+    """A heading with one line explaining what the section is for."""
+    st.markdown(
+        f'<div class="cx-group"><h3>{html.escape(title)}</h3>'
+        f'<p>{html.escape(description)}</p></div>',
         unsafe_allow_html=True,
     )
 
