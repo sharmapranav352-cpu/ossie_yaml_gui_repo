@@ -111,10 +111,10 @@ SYNC_TIMEOUT = 15 * 60   # stop checking automatically after 15 minutes
 SYNC_EVERY = 5           # seconds between checks while in progress
 
 OVERALL = {
-    "done": ("success", "Both repositories are in sync."),
-    "active": ("info", "Syncing. This updates by itself every few seconds."),
+    "done": ("success", "Both repositories are in sync and both deployments finished."),
+    "active": ("info", "In progress. This updates by itself every few seconds."),
     "waiting": ("warning", "Waiting for a pull request to be merged. This updates by itself."),
-    "error": ("error", "The sync stopped. See the step marked in red."),
+    "error": ("error", "A step failed. See the step marked in red."),
     "idle": ("info", "This version isn't published yet."),
 }
 

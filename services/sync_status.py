@@ -20,6 +20,12 @@ API = "https://api.github.com"
 TIMEOUT = 20
 SYNC_BRANCH = "sync/sit-yaml-gui"   # branch the sync workflow uses for its PRs
 
+# Workflows in the contracts repo that run when the file changes on main
+DEPLOY_WORKFLOWS = [
+    ("deploy-semantic-view.yml", "Convert and Deploy Snowflake Semantic View YAML"),
+    ("fabric-deploy-ossie-model.yml", "Fabric deploy Ossie semantic model"),
+]
+
 
 class _NoAccess(Exception):
     pass
@@ -74,7 +80,13 @@ def check(cfg, yaml_text, publish):
         {"key": "sync", "label": "Sync workflow", "state": "pending", "detail": "", "url": None},
         {"key": "target", "label": "Updated in Snowflake's Semantic Layer", "state": "pending", "detail": "", "url": None},
     ]
-    s_src, s_sync, s_tgt = stages
+    deploy_stages = [
+        {"key": f"deploy:{wf}", "label": label, "state": "pending",
+         "detail": "Starts when the file is updated.", "url": None}
+        for wf, label in DEPLOY_WORKFLOWS
+    ]
+    stages.extend(deploy_stages)
+    s_src, s_sync, s_tgt = stages[:3]
 
     # ---- 1. source repo -----------------------------------------------------
     main_sha = publish.get("sha")
@@ -125,7 +137,7 @@ def check(cfg, yaml_text, publish):
                      url=f"https://github.com/{tgt}/blob/{cfg['contracts_branch']}/{cfg['contracts_file']}")
         s_sync.update(state="done", detail="Finished.")
         _attach_run(cfg, main_sha, s_sync, finished_ok=True)
-        return stages, "done"
+        return stages, _follow_deploys(cfg, deploy_stages)
 
     # ---- 2. sync workflow ------------------------------------------------------
     _attach_run(cfg, main_sha, s_sync, finished_ok=False)
@@ -191,6 +203,67 @@ def _attach_run(cfg, sha, stage, finished_ok):
         stage.update(state="done", detail="Finished.")
     else:
         stage.update(state="error", detail=f"The run ended with '{conclusion}'. Open it for details.")
+
+
+def _run_state(repo, workflow, token, sha):
+    """(state, detail, url) of a workflow's run for a commit; None if it can't be read."""
+    try:
+        data = _get(repo, f"/actions/workflows/{workflow}/runs", token,
+                    {"head_sha": sha, "per_page": 1}) or {}
+    except _NoAccess:
+        return None
+    runs = data.get("workflow_runs") or []
+    if not runs:
+        return "active", f"Waiting for the run for {_short(sha)} to start...", None
+    run = runs[0]
+    status, conclusion = run.get("status"), run.get("conclusion")
+    if status != "completed":
+        return ("active",
+                "Queued..." if status in ("queued", "waiting", "pending") else "Running...",
+                run.get("html_url"))
+    if conclusion == "success":
+        return "done", "Finished.", run.get("html_url")
+    return "error", f"The run ended with '{conclusion}'. Open it for details.", run.get("html_url")
+
+
+def _follow_deploys(cfg, deploy_stages):
+    """
+    Fill the deploy steps from the contracts repo's workflow runs for the
+    commit that last changed the file there. Returns the overall state.
+    """
+    tgt, tok = cfg["contracts_repo"], cfg["contracts_token"]
+    try:
+        commits = _get(tgt, "/commits", tok, {
+            "path": cfg["contracts_file"], "sha": cfg["contracts_branch"], "per_page": 1,
+        }) or []
+    except _NoAccess:
+        commits = []
+    sha = commits[0]["sha"] if commits else None
+
+    if not sha:
+        for s in deploy_stages:
+            s.update(state="error", detail=(
+                f"Can't read the workflow runs in {tgt}. Add a read-only "
+                "contracts_token (Actions: Read) to the app's secrets."))
+        return "error"
+
+    for s, (wf, _) in zip(deploy_stages, DEPLOY_WORKFLOWS):
+        result = _run_state(tgt, wf, tok, sha)
+        if result is None:
+            s.update(state="error", detail=(
+                f"Can't read this workflow in {tgt}. Add a read-only "
+                "contracts_token (Actions: Read) to the app's secrets."))
+            continue
+        state, detail, url = result
+        s.update(state=state, detail=detail,
+                 url=url or f"https://github.com/{tgt}/actions/workflows/{wf}")
+
+    states = [s["state"] for s in deploy_stages]
+    if "error" in states:
+        return "error"
+    if "active" in states:
+        return "active"
+    return "done"
 
 
 def _file_name(publish, cfg):

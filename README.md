@@ -71,6 +71,9 @@ repositories and refreshes by itself until they match:
 2. Sync workflow (queued, running, finished or failed, with a link to the run)
 3. Updated in ossie-semantic-contracts (waits for its pull request, if the
    sync opened one)
+4. Convert and Deploy Snowflake Semantic View YAML (workflow in
+   ossie-semantic-contracts, for the commit that updated the file)
+5. Fabric deploy Ossie semantic model (same)
 
 "In sync" means the file on both main branches is exactly the YAML you
 published. Select **Check now** to see where the current version is at any time.
