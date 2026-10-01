@@ -2,9 +2,9 @@ from pathlib import Path
 
 # Every generated model is saved under this one name, locally and on GitHub.
 # Set to None to name files after the model instead.
-FIXED_OUTPUT_FILE = "SIT_YAML_GUI.yaml"
+FIXED_OUTPUT_FILE = "SALES_AND_ORDERS.yaml"
 
-# The model name the file must carry. SIT_YAML_GUI.yaml is synced to
+# The model name the file must carry. SALES_AND_ORDERS.yaml is synced to
 # ossie-semantic-contracts, which deploys it as this semantic view.
 # Set to None to allow any name.
 EXPECTED_MODEL_NAME = "SALES_AND_ORDERS"
