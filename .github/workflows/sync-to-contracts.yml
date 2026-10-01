@@ -1,6 +1,6 @@
 name: Sync to ossie-semantic-contracts
 
-# When outputs/SIT_YAML_GUI.yaml changes on main, copy it to
+# When outputs/SALES_AND_ORDERS.yaml changes on main, copy it to
 # project-compass-SIT/ossie-semantic-contracts as
 # ossie_yaml/SALES_AND_ORDERS.yaml.
 #
@@ -17,7 +17,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "outputs/SIT_YAML_GUI.yaml"
+      - "outputs/SALES_AND_ORDERS.yaml"
   workflow_dispatch:
 
 permissions:
@@ -28,7 +28,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SOURCE_FILE: outputs/SIT_YAML_GUI.yaml
+  SOURCE_FILE: outputs/SALES_AND_ORDERS.yaml
   TARGET_REPO: project-compass-SIT/ossie-semantic-contracts
   TARGET_FILE: ossie_yaml/SALES_AND_ORDERS.yaml
   EXPECTED_NAME: ${{ vars.CONTRACTS_MODEL_NAME || 'SALES_AND_ORDERS' }}

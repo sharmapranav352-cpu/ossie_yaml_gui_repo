@@ -1,5 +1,5 @@
 """
-Tracks a published SIT_YAML_GUI.yaml through both repositories:
+Tracks a published SALES_AND_ORDERS.yaml through both repositories:
 
   1. ossie_yaml_gui_repo        the file is on main (after the PR is merged, if any)
   2. Sync workflow              "Sync to ossie-semantic-contracts" runs for that commit
@@ -268,4 +268,4 @@ def _follow_deploys(cfg, deploy_stages):
 
 def _file_name(publish, cfg):
     from utils.file_manager import FIXED_OUTPUT_FILE
-    return FIXED_OUTPUT_FILE or (publish or {}).get("file") or "SIT_YAML_GUI.yaml"
+    return FIXED_OUTPUT_FILE or (publish or {}).get("file") or "SALES_AND_ORDERS.yaml"

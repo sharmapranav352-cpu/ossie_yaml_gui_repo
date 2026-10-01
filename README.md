@@ -45,9 +45,9 @@ Never commit the token to the repository.
 
 The app writes standard Apache Ossie YAML, version `0.2.0.dev0`, with the
 model at the top level (no `semantic_model:` wrapper). The file is always
-`outputs/SIT_YAML_GUI.yaml` and the model is always named `SALES_AND_ORDERS`.
+`outputs/SALES_AND_ORDERS.yaml` and the model is always named `SALES_AND_ORDERS`.
 
-When `outputs/SIT_YAML_GUI.yaml` changes on `main`, the
+When `outputs/SALES_AND_ORDERS.yaml` changes on `main`, the
 *Sync to ossie-semantic-contracts* workflow checks it, runs it through that
 repo's Snowflake converter, and copies it to
 `project-compass-SIT/ossie-semantic-contracts` as

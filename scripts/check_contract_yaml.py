@@ -1,5 +1,5 @@
 """
-Checks outputs/SIT_YAML_GUI.yaml before it is copied to
+Checks outputs/SALES_AND_ORDERS.yaml before it is copied to
 project-compass-SIT/ossie-semantic-contracts, where merging it deploys a
 semantic view to Snowflake.
 
