@@ -5,7 +5,7 @@ from utils.navigation import PAGES
 from utils.state import init_state
 
 st.set_page_config(
-    page_title="Project Compass | Semantic Model Builder",
+    page_title="Project Compass | SemanticOps",
     page_icon=icon_path() or ":material/hub:",
     layout="wide",
 )

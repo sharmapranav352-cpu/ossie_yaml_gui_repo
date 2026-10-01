@@ -138,6 +138,7 @@ page_header(
     "Build a semantic model",
     "Pick the tables your analysts use, describe how they join, define "
     "the business metrics, and publish an Ossie YAML file ready to deploy.",
+    compact=True,
 )
 
 left, right = st.columns([1.45, 1], gap="medium")
