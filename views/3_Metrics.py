@@ -78,14 +78,14 @@ metrics = []
 #################################################
 
 # Column layout shared by the header row and every metric row
-LAYOUT = [1.5, 0.85, 1.85, 1.8, 0.32]
+LAYOUT = [1.45, 0.82, 1.8, 1.7, 0.6, 0.3]
 
 with st.container(border=True):
 
     if ids:
         head = st.columns(LAYOUT, vertical_alignment="bottom")
         for col, label in zip(head, ["Name", "Aggregation", "Calculation",
-                                     "Description", ""]):
+                                     "Description", "Add Dialect", ""]):
             col.markdown(f"**{label}**" if label else "")
 
     for rid in ids:
@@ -149,11 +149,40 @@ with st.container(border=True):
             label_visibility="collapsed",
         ).strip()
 
-        row[4].button(
+        # "Add Dialect": a second expression for Power BI / Fabric, always DAX
+        seed_value(f"met_{rid}_add_dax", bool(prev.get("add_dax")))
+        add_dax = row[4].checkbox(
+            "DAX", key=f"met_{rid}_add_dax",
+            help="Add a DAX expression for this metric. It is written to the "
+                 "YAML as a second dialect, after SNOWFLAKE.",
+        )
+
+        row[5].button(
             "", icon=":material/delete:", key=f"met_{rid}_del",
             help="Remove this metric",
             on_click=delete_row, args=("met_", rid),
         )
+
+        metric["add_dax"] = add_dax
+        metric["dax_expression"] = prev.get("dax_expression", "")
+
+        if add_dax:
+            # DAX box under the row, spanning Aggregation, Calculation and Description
+            dax_row = st.columns(
+                [LAYOUT[0], LAYOUT[1] + LAYOUT[2] + LAYOUT[3], LAYOUT[4] + LAYOUT[5]],
+                vertical_alignment="center",
+            )
+            dax_row[0].markdown(
+                "<div style='text-align:right;color:#5A6878;font-size:.875rem;"
+                "font-weight:600;padding-right:.25rem'>DAX</div>",
+                unsafe_allow_html=True,
+            )
+            seed_value(f"met_{rid}_dax", prev.get("dax_expression", ""))
+            metric["dax_expression"] = dax_row[1].text_input(
+                "DAX expression", key=f"met_{rid}_dax",
+                placeholder="DIVIDE([TOTAL_PRICE], [TOTAL_QUANTITY])",
+                label_visibility="collapsed",
+            ).strip()
 
         metrics.append(metric)
 
@@ -169,7 +198,8 @@ with st.container(border=True):
 
 st.caption(
     "Choose CUSTOM to write your own expression, for example one metric "
-    "divided by another."
+    "divided by another. Tick Add Dialect to add a DAX expression for "
+    "Power BI / Fabric."
 )
 
 #################################################

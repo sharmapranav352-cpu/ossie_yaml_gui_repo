@@ -18,7 +18,7 @@ from services.builders import validate
 from utils.navigation import BY_KEY, PAGES
 
 PROJECT = "Project Compass"
-PRODUCT = "Semantic Model Builder"
+PRODUCT = "SemanticOps"
 COMPANY = "Snap Analytics"
 
 ASSETS = Path("assets")
@@ -110,10 +110,11 @@ h2, h3 {{ letter-spacing: -0.005em; }}
 }}
 .cx-brand img {{ height: 64px; width: auto; display: block; }}
 .cx-brand .cx-wordmark {{
-  color: var(--cx-ink); font-weight: 700; font-size: 1.375rem;
-  letter-spacing: -0.02em; white-space: nowrap;
+  color: var(--cx-ink); font-weight: 700; font-size: 2.125rem; line-height: 1.15;
+  letter-spacing: -0.025em; white-space: nowrap;
 }}
-.cx-brand .cx-divider {{ width: 1px; height: 28px; background: var(--cx-line); }}
+.cx-brand .cx-product {{ font-size: 1.0625rem; }}
+.cx-brand .cx-divider {{ width: 1px; height: 34px; background: var(--cx-line); }}
 .cx-pills {{ display: flex; gap: .5rem; flex-wrap: wrap; }}
 .cx-pill {{
   display: inline-flex; align-items: center; gap: .4rem;
@@ -167,6 +168,8 @@ h2, h3 {{ letter-spacing: -0.005em; }}
 .cx-title {{ margin: 0 0 1.5rem; max-width: 46rem; }}
 .cx-title h1 {{ margin: 0 0 .375rem; padding: 0; line-height: 1.2; }}
 .cx-title p {{ margin: 0; color: var(--cx-muted); font-size: 1.0625rem; line-height: 1.55; }}
+.cx-title.is-compact h1 {{ font-size: 1.5rem; letter-spacing: -0.01em; }}
+.cx-title.is-compact p {{ font-size: .9375rem; }}
 
 /* ---------- Section labels inside cards ---------- */
 [data-testid="stMarkdownContainer"] p.cx-section {{
@@ -323,10 +326,11 @@ def section_heading(title, description):
     )
 
 
-def page_header(title, description=None):
+def page_header(title, description=None, compact=False):
     desc = f"<p>{html.escape(description)}</p>" if description else ""
+    cls = "cx-title is-compact" if compact else "cx-title"
     st.markdown(
-        f'<div class="cx-title"><h1>{html.escape(title)}</h1>{desc}</div>',
+        f'<div class="{cls}"><h1>{html.escape(title)}</h1>{desc}</div>',
         unsafe_allow_html=True,
     )
 

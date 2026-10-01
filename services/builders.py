@@ -123,11 +123,24 @@ def metric_expression(metric):
     return f"{mtype}({ref})"
 
 
+# Second dialect a metric can carry, for Power BI / Fabric
+EXTRA_DIALECT = "DAX"
+
+
+def metric_dialects(metric):
+    """SNOWFLAKE first, then DAX when "Add Dialect" is ticked and filled in."""
+    dialects = [{"dialect": "SNOWFLAKE", "expression": metric_expression(metric)}]
+    dax = (metric.get("dax_expression") or "").strip()
+    if metric.get("add_dax") and dax:
+        dialects.append({"dialect": EXTRA_DIALECT, "expression": dax})
+    return dialects
+
+
 def build_metrics(cfg):
     return [
         {
             "name": metric["name"],
-            "expression": _snowflake_expr(metric_expression(metric)),
+            "expression": {"dialects": metric_dialects(metric)},
             "description": metric.get("description", ""),
             "custom_extensions": copy.deepcopy(PUBLIC_ACCESS),
         }
@@ -218,6 +231,11 @@ def validate(saved):
                     f"{label}: column {metric.get('column')} is not "
                     f"selected in dataset {table}."
                 )
+
+        if metric.get("add_dax") and not (metric.get("dax_expression") or "").strip():
+            errors.append(
+                f"{label}: enter a DAX expression, or untick Add Dialect."
+            )
 
         if not (metric.get("description") or "").strip():
             warnings.append(f"{label} has no description.")

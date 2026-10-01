@@ -7,7 +7,7 @@ FIXED_OUTPUT_FILE = "SIT_YAML_GUI.yaml"
 # The model name the file must carry. SIT_YAML_GUI.yaml is synced to
 # ossie-semantic-contracts, which deploys it as this semantic view.
 # Set to None to allow any name.
-EXPECTED_MODEL_NAME = "SIT_TEST1"
+EXPECTED_MODEL_NAME = "SALES_AND_ORDERS"
 
 OUTPUT_DIR = Path(
     "outputs"

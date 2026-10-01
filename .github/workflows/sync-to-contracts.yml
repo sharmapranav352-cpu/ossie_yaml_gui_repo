@@ -2,7 +2,7 @@ name: Sync to ossie-semantic-contracts
 
 # When outputs/SIT_YAML_GUI.yaml changes on main, copy it to
 # project-compass-SIT/ossie-semantic-contracts as
-# ossie_yaml/SIT_TEST1_0.2.0.dev0_ossie.yaml.
+# ossie_yaml/SALES_AND_ORDERS.yaml.
 #
 # In that repo, a change to that file on main converts it and DEPLOYS the
 # semantic view to Snowflake, so by default this opens a pull request there.
@@ -30,8 +30,8 @@ concurrency:
 env:
   SOURCE_FILE: outputs/SIT_YAML_GUI.yaml
   TARGET_REPO: project-compass-SIT/ossie-semantic-contracts
-  TARGET_FILE: ossie_yaml/SIT_TEST1_0.2.0.dev0_ossie.yaml
-  EXPECTED_NAME: ${{ vars.CONTRACTS_MODEL_NAME || 'SIT_TEST1' }}
+  TARGET_FILE: ossie_yaml/SALES_AND_ORDERS.yaml
+  EXPECTED_NAME: ${{ vars.CONTRACTS_MODEL_NAME || 'SALES_AND_ORDERS' }}
   SYNC_MODE: ${{ vars.CONTRACTS_SYNC_MODE || 'pull_request' }}
 
 jobs:
@@ -85,12 +85,12 @@ jobs:
           base: main
           branch: sync/sit-yaml-gui
           add-paths: ${{ env.TARGET_FILE }}
-          commit-message: "Update SIT_TEST1 Ossie YAML from ossie_yaml_gui_repo"
-          title: "Update SIT_TEST1 Ossie YAML from the Semantic Model Builder"
+          commit-message: "Update SALES_AND_ORDERS Ossie YAML from ossie_yaml_gui_repo"
+          title: "Update SALES_AND_ORDERS Ossie YAML from SemanticOps"
           body: |
             Synced from `${{ github.repository }}` (`${{ env.SOURCE_FILE }}`, commit ${{ github.sha }}).
 
-            **Merging this deploys the SIT_TEST1 semantic view to Snowflake** through the
+            **Merging this deploys the SALES_AND_ORDERS semantic view to Snowflake** through the
             *Convert and Deploy Snowflake Semantic View YAML* workflow.
             Review the changes under **Files changed** first.
           delete-branch: true
@@ -102,5 +102,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- "$TARGET_FILE"
-          git commit -m "Update SIT_TEST1 Ossie YAML from ossie_yaml_gui_repo@${GITHUB_SHA::7}"
+          git commit -m "Update SALES_AND_ORDERS Ossie YAML from ossie_yaml_gui_repo@${GITHUB_SHA::7}"
           git push origin HEAD:main

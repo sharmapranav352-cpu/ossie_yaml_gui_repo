@@ -54,7 +54,7 @@ def settings():
             "contracts_repo", "project-compass-SIT/ossie-semantic-contracts"
         ).strip().strip("/"),
         "contracts_file": cfg.get(
-            "contracts_file", "ossie_yaml/SIT_TEST1_0.2.0.dev0_ossie.yaml"
+            "contracts_file", "ossie_yaml/SALES_AND_ORDERS.yaml"
         ),
         "contracts_branch": cfg.get("contracts_branch", "main"),
         "contracts_token": cfg.get("contracts_token") or None,
@@ -191,7 +191,7 @@ def save_file(filename, text, message=None, mode=None):
         }
 
     action = "Update"
-    message = message or f"{action} {path} from Semantic Model Builder"
+    message = message or f"{action} {path} from SemanticOps"
 
     if mode == "direct":
         result = _put_file(cfg, path, text, message, cfg["branch"], sha)
@@ -213,7 +213,7 @@ def save_file(filename, text, message=None, mode=None):
         cfg, branch,
         title=message,
         body=(
-            f"{action}s `{path}` from the Semantic Model Builder app.\n\n"
+            f"{action}s `{path}` from the SemanticOps app.\n\n"
             "Review the changes under **Files changed**, then merge."
         ),
     )

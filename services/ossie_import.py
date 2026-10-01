@@ -30,6 +30,16 @@ class OssieImportError(ValueError):
     pass
 
 
+def _dialect_expression(obj, dialect):
+    """The expression for one dialect (e.g. DAX), or None if it isn't there."""
+    if not isinstance(obj, dict):
+        return None
+    for d in obj.get("dialects") or []:
+        if str(d.get("dialect", "")).upper() == dialect:
+            return str(d.get("expression", ""))
+    return None
+
+
 def _snowflake_expression(obj):
     """Pull the SNOWFLAKE dialect expression out of an OSSIE expression block."""
     if isinstance(obj, str):
@@ -193,6 +203,20 @@ def parse_ossie_yaml(text):
             if distinct and func != "COUNT":
                 metric.update({"type": "CUSTOM", "table": None,
                                "column": None, "expression": expr})
+
+        dax = _dialect_expression(m.get("expression"), "DAX")
+        metric["add_dax"] = dax is not None
+        metric["dax_expression"] = dax or ""
+
+        other = sorted({
+            str(d.get("dialect", "")).upper()
+            for d in ((m.get("expression") or {}).get("dialects") or [])
+        } - {"SNOWFLAKE", "DAX"})
+        if other:
+            notes.append(
+                f"Metric {metric['name']}: {', '.join(other)} expressions aren't "
+                "supported by the editor and will be dropped on save."
+            )
 
         metrics.append(metric)
 
